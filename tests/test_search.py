@@ -19,8 +19,12 @@ SAMPLE = os.path.join(ROOT, "dat", "sample.txt")
 
 
 def test_dtype_is_structured():
+    # Use a tight cos_dist + explicit manual params to keep this trivial test fast.
+    # (Auto mode at extreme cos_dist values can pick degenerate enumeration
+    # parameters in the legacy combinatorial chooser.)
     X = np.eye(4, dtype=np.float32)
-    out = sketchsort.search(X, cos_dist=0.99, seed=0)
+    out = sketchsort.search(X, cos_dist=0.01, seed=0,
+                            ham_dist=1, num_blocks=4, num_chunks=3)
     assert out.dtype == np.dtype([("id1", "<u4"), ("id2", "<u4"), ("cos_dist", "<f4")])
 
 

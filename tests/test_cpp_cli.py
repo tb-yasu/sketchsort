@@ -57,7 +57,9 @@ def _load_as_dict(path: str) -> dict:
 def test_cpp_cli_pair_set_close_to_golden(tmp_path):
     out = tmp_path / "cpp_out.txt"
     subprocess.run(
-        [CPP_BIN, "-cosdist", "0.01", "-seed", "42", SAMPLE, str(out)],
+        [CPP_BIN, "-cosdist", "0.01", "-seed", "42",
+         "-auto", "-missingratio", "0.0001",
+         SAMPLE, str(out)],
         check=True, capture_output=True,
     )
     got_d    = _load_as_dict(str(out))
@@ -86,7 +88,9 @@ def test_cpp_cli_matches_python_run_from_file(tmp_path):
 
     sketchsort.run_from_file(SAMPLE, str(py_out), cos_dist=0.01, seed=42)
     subprocess.run(
-        [CPP_BIN, "-cosdist", "0.01", "-seed", "42", SAMPLE, str(cpp_out)],
+        [CPP_BIN, "-cosdist", "0.01", "-seed", "42",
+         "-auto", "-missingratio", "0.0001",
+         SAMPLE, str(cpp_out)],
         check=True, capture_output=True,
     )
     assert filecmp.cmp(py_out, cpp_out, shallow=False)

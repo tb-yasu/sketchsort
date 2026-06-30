@@ -26,12 +26,13 @@ import numpy as np
 import sketchsort
 
 X = np.loadtxt("dat/sample.txt", dtype=np.float32)   # shape (N, D)
+
+# Typical usage: just cos_dist + missing_ratio. The library picks the
+# sketching parameters automatically.
 pairs = sketchsort.search(
     X,
-    cos_dist=0.01,
-    num_blocks=4,
-    ham_dist=1,
-    num_chunks=3,
+    cos_dist=0.01,        # report pairs with cos distance <= 0.01
+    missing_ratio=0.0001, # at most 0.01% of true neighbors may be missed
     seed=42,
 )
 
@@ -41,7 +42,12 @@ for id1, id2, d in pairs:
 ```
 
 `sketchsort.search(...)` returns a NumPy structured array. `id1` / `id2` are
-row indices in the input matrix `X`.
+row indices in the input matrix `X`. Smaller `missing_ratio` is more
+thorough (catches more true neighbors) at the cost of more time.
+
+If you need to control the sketch enumeration explicitly, pass
+`ham_dist=..., num_blocks=..., num_chunks=...` and `missing_ratio` becomes
+inert. Setting any of those three switches the call into manual mode.
 
 If you have a file in the legacy text format and want byte-identical output
 to the C++ CLI, call:
@@ -52,17 +58,22 @@ sketchsort.run_from_file("input.txt", "output.txt", cos_dist=0.01, seed=42)
 
 ## Command line
 
-The pip install ships a `sketchsort` console script that mirrors the legacy
-C++ CLI:
+The pip install ships a `sketchsort` console script. Same defaults as the
+Python API — auto mode unless you pass any of `-hamdist` / `-numblocks` /
+`-numchunks`.
 
 ```
-sketchsort -cosdist 0.01 -seed 42 input.txt output.txt
+# Typical: cos_dist + missing_ratio
+sketchsort -cosdist 0.01 -missingratio 0.0001 -seed 42 input.txt output.txt
+
+# Manual override (legacy 0.0.8 style)
+sketchsort -cosdist 0.01 -hamdist 1 -numblocks 4 -numchunks 3 -seed 42 input.txt output.txt
 ```
 
-Supported flags: `-cosdist`, `-hamdist`, `-numblocks`, `-numchunks`, `-auto`,
-`-missingratio`, `-centering`, `-seed`. The input file is whitespace-separated
-float vectors, one per line, no ID column. The output file is `id1 id2
-cos_dist` triples.
+Flags: `-cosdist`, `-missingratio`, `-hamdist`, `-numblocks`, `-numchunks`,
+`-auto`, `-centering`, `-seed`, `-quiet`. The input file is whitespace-
+separated float vectors, one per line, no ID column. The output file is
+`id1 id2 cos_dist` triples.
 
 ## 0.1.0 release notes (based on upstream 0.0.8)
 

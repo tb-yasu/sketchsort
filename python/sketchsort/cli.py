@@ -1,16 +1,19 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 SketchSort contributors
-"""Command-line entry point matching the legacy C++ sketchsort CLI.
+"""Command-line entry point.
 
-The argument names and the output file format are kept byte-identical with the
-C++ binary (src/Main.cpp + src/SketchSort.cpp) by delegating to the C++ side
-via run_from_file().
+Argument names mirror the legacy C++ sketchsort CLI for back-compat. The
+new behaviour: if `-hamdist` / `-numblocks` / `-numchunks` are NOT given,
+the run defaults to **auto mode** (the library picks them from
+`-missingratio`). Pass any of those three to switch to manual mode. The
+`-auto` flag is kept as an explicit override (forces auto mode even when
+manual params are given).
 """
 
 import argparse
 import sys
 
-from ._core import run_from_file
+from . import run_from_file
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -19,18 +22,18 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Fast all-pairs cosine-similarity search via random projection sketches.",
         add_help=True,
     )
-    p.add_argument("-hamdist", type=int, default=1,
-                   help="maximum Hamming distance (default: 1)")
-    p.add_argument("-numblocks", type=int, default=4,
-                   help="number of blocks (default: 4)")
     p.add_argument("-cosdist", type=float, default=0.01,
                    help="maximum cosine distance (default: 0.01)")
-    p.add_argument("-numchunks", type=int, default=3,
-                   help="number of chunks (default: 3)")
-    p.add_argument("-auto", dest="auto_mode", action="store_true",
-                   help="derive ham_dist / num_blocks / num_chunks from -missingratio")
     p.add_argument("-missingratio", type=float, default=0.0001,
-                   help="target missing edge ratio used with -auto (default: 0.0001)")
+                   help="target missing-edge ratio used in auto mode (default: 0.0001)")
+    p.add_argument("-hamdist", type=int, default=None,
+                   help="manual override: Hamming distance per chunk")
+    p.add_argument("-numblocks", type=int, default=None,
+                   help="manual override: number of blocks per chunk")
+    p.add_argument("-numchunks", type=int, default=None,
+                   help="manual override: number of independent sketch chunks")
+    p.add_argument("-auto", dest="force_auto", action="store_true",
+                   help="force auto mode even if -hamdist/-numblocks/-numchunks are given")
     p.add_argument("-centering", dest="centering", action="store_true",
                    help="subtract per-dimension mean before sketching")
     p.add_argument("-seed", type=int, default=0,
@@ -45,14 +48,23 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = _build_parser().parse_args(argv)
     try:
+        # When force_auto is set, blank the manual knobs so the wrapper
+        # selects auto mode. Otherwise pass whatever the user gave through
+        # to the wrapper, which auto-detects.
+        if args.force_auto:
+            ham_dist = num_blocks = num_chunks = None
+        else:
+            ham_dist   = args.hamdist
+            num_blocks = args.numblocks
+            num_chunks = args.numchunks
+
         run_from_file(
             input_path=args.infile,
             output_path=args.outfile,
             cos_dist=args.cosdist,
-            ham_dist=args.hamdist,
-            num_blocks=args.numblocks,
-            num_chunks=args.numchunks,
-            auto_mode=args.auto_mode,
+            ham_dist=ham_dist,
+            num_blocks=num_blocks,
+            num_chunks=num_chunks,
             missing_ratio=args.missingratio,
             centering=args.centering,
             seed=args.seed,
