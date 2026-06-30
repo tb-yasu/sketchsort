@@ -562,7 +562,9 @@ void SketchSort::search(const float *data, std::size_t n_rows, std::size_t n_col
   if (n_rows == 0 || n_cols == 0) {
     throw std::invalid_argument("X must be non-empty");
   }
-  if (n_rows > std::numeric_limits<std::uint32_t>::max()) {
+  // Extra parens around `max` defeat the Windows <windows.h> `max` macro
+  // that would otherwise hijack `std::numeric_limits<...>::max()` here.
+  if (n_rows > (std::numeric_limits<std::uint32_t>::max)()) {
     throw std::invalid_argument("number of rows exceeds uint32 id range");
   }
 
