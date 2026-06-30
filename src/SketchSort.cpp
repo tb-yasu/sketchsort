@@ -31,13 +31,6 @@ inline uint8_t sign(T val) {
   return 0;
 }
 
-template<class T>
-inline T max(T a1, T a2) {
-  if (a1 > a2)
-    return a1;
-  return a2;
-}
-
 bool cmp(const std::pair<int, float> &p1, const std::pair<int, float> &p2) {
   return p1.second < p2.second;
 }

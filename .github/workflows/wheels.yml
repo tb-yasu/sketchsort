@@ -38,7 +38,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
+        # @v2 floats to the latest 2.x; pinning v2.21.3 broke ubuntu in 2026
+        # because that release pointed at a manylinux2014 image tag (2024.10.07-1)
+        # that has since been deleted from quay.io.
+        uses: pypa/cibuildwheel@v2
         env:
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-*"
           CIBW_SKIP: "*-musllinux_* pp* *-win32"
