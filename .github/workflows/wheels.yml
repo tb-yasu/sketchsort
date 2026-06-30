@@ -18,16 +18,20 @@ jobs:
   build_wheels:
     name: wheel ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    # Windows is best-effort: vendored Boost (2011) + MSVC has high risk of
-    # macro / header incompatibilities. If it breaks, the release still ships.
+    # - Windows: best-effort. Vendored Boost (2011) + MSVC has high risk of
+    #   macro / header incompatibilities; if it breaks, the release still ships.
+    # - macos-13 (Intel) is intentionally NOT in the matrix: GitHub's Apple
+    #   Intel runner pool is chronically backlogged (Apple is deprecating Intel
+    #   macs) and jobs can sit queued for hours. Intel Mac users install via
+    #   sdist (`pip install sketchsort` will fall back to source build on a
+    #   non-arm64 macOS).
     continue-on-error: ${{ matrix.allow-failure }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - { os: ubuntu-latest, allow-failure: false }
-          - { os: macos-13,      allow-failure: false }
-          - { os: macos-14,      allow-failure: false }
+          - { os: macos-14,      allow-failure: false }   # macOS arm64 (Apple Silicon)
           - { os: windows-latest, allow-failure: true }
 
     steps:

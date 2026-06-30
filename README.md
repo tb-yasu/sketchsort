@@ -14,8 +14,10 @@ scheme.
 pip install sketchsort
 ```
 
-Wheels are provided for CPython 3.9–3.13 on Linux (x86_64) and macOS
-(x86_64 / arm64). Windows wheels are not yet shipped.
+Wheels are provided for CPython 3.9–3.13 on Linux (x86_64) and macOS arm64
+(Apple Silicon). Intel macOS and Windows are not yet provided as wheels; on
+those platforms `pip install sketchsort` will fall back to a source build
+(requires a C++17 compiler and CMake).
 
 ## Python API
 
