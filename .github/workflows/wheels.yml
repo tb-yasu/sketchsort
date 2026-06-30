@@ -1,0 +1,154 @@
+name: Build wheels
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/**"
+      - "bindings/**"
+      - "python/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "pyproject.toml"
+      - ".github/workflows/wheels.yml"
+
+jobs:
+  build_wheels:
+    name: wheel ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    # Windows is best-effort: vendored Boost (2011) + MSVC has high risk of
+    # macro / header incompatibilities. If it breaks, the release still ships.
+    continue-on-error: ${{ matrix.allow-failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, allow-failure: false }
+          - { os: macos-13,      allow-failure: false }
+          - { os: macos-14,      allow-failure: false }
+          - { os: windows-latest, allow-failure: true }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-*"
+          CIBW_SKIP: "*-musllinux_* pp* *-win32"
+          CIBW_ARCHS_LINUX: "x86_64"
+          CIBW_TEST_REQUIRES: "pytest numpy"
+          # The wheel does NOT ship the C++ CLI, so test_cpp_cli.py is excluded.
+          CIBW_TEST_COMMAND: >-
+            pytest {project}/tests/test_search.py
+            {project}/tests/test_cli.py
+            {project}/tests/test_golden.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  cpp_cli_compat:
+    name: C++ CLI byte-exact compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps and project
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Build C++ CLI via CMake (Release; same flags as wheel)
+        run: |
+          cmake -B build_cli \
+            -DSKETCHSORT_BUILD_CLI=ON \
+            -DSKETCHSORT_BUILD_PYTHON=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_cli --target sketchsort_cli
+
+      - name: Run byte-exact compatibility tests
+        env:
+          SKETCHSORT_CPP_CLI_BIN: ${{ github.workspace }}/build_cli/sketchsort
+        run: pytest tests/test_cpp_cli.py -v
+
+  # ---------------------------------------------------------------------------
+  # Publish jobs (Trusted Publishing — no API tokens stored in the repo).
+  # Setup on PyPI side: create a project + "pending publisher" entry pointing at
+  # this repository, this workflow filename, and the environment name below.
+  # See RELEASE.md for the exact steps.
+  # ---------------------------------------------------------------------------
+
+  publish_testpypi:
+    name: Publish to TestPyPI
+    # workflow_dispatch is the manual "try a dry run" trigger.
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/sketchsort
+    permissions:
+      id-token: write    # required for OIDC trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "wheels-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - run: ls -la dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # skip wheels already on TestPyPI (re-running the workflow with the
+          # same version is otherwise an error)
+          skip-existing: true
+
+  publish_pypi:
+    name: Publish to PyPI
+    # Only fires on a GitHub Release publish event.
+    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: [build_wheels, build_sdist, cpp_cli_compat]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/sketchsort
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "wheels-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - run: ls -la dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
