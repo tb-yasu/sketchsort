@@ -19,9 +19,8 @@ SAMPLE = os.path.join(ROOT, "dat", "sample.txt")
 
 
 def test_dtype_is_structured():
-    # Use a tight cos_dist + explicit manual params to keep this trivial test fast.
-    # (Auto mode at extreme cos_dist values can pick degenerate enumeration
-    # parameters in the legacy combinatorial chooser.)
+    # Use a tight cos_dist + explicit manual params to keep this trivial test fast
+    # (auto mode does extra work searching for ham_dist/num_blocks/num_chunks).
     X = np.eye(4, dtype=np.float32)
     out = sketchsort.search(X, cos_dist=0.01, seed=0,
                             ham_dist=1, num_blocks=4, num_chunks=3)
@@ -95,3 +94,90 @@ def test_cos_dist_within_threshold():
     out = sketchsort.search(X, cos_dist=threshold, seed=42)
     if out.size:
         assert out["cos_dist"].max() <= threshold + 1e-6
+
+
+def test_rejects_ham_dist_not_less_than_num_blocks():
+    X = np.eye(4, dtype=np.float32)
+    with pytest.raises(ValueError):
+        sketchsort.search(X, ham_dist=5, num_blocks=4, num_chunks=3)
+
+
+def test_rejects_zero_num_chunks():
+    X = np.eye(4, dtype=np.float32)
+    with pytest.raises(ValueError):
+        sketchsort.search(X, ham_dist=1, num_blocks=4, num_chunks=0)
+
+
+@pytest.mark.parametrize("bad_cos_dist", [-0.1, 2.5])
+def test_rejects_out_of_range_cos_dist(bad_cos_dist):
+    X = np.eye(4, dtype=np.float32)
+    with pytest.raises(ValueError):
+        sketchsort.search(X, cos_dist=bad_cos_dist, ham_dist=1, num_blocks=4, num_chunks=3)
+
+
+@pytest.mark.parametrize("bad_seed", [-1, 2**32])
+def test_rejects_out_of_range_seed(bad_seed):
+    X = np.eye(4, dtype=np.float32)
+    with pytest.raises(ValueError):
+        sketchsort.search(X, seed=bad_seed)
+
+
+def test_rejects_zero_norm_row():
+    # Row 1 is all-zero: its norm is zero, so a cosine distance to it is
+    # undefined. This used to be silently dropped from every pair; it now
+    # raises with the offending row number in the message.
+    X = np.array(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    with pytest.raises(ValueError, match=r"row 1"):
+        sketchsort.search(X, ham_dist=1, num_blocks=4, num_chunks=3)
+
+
+def test_rejects_nan_row_no_centering():
+    X = np.array(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [np.nan, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    with pytest.raises(ValueError, match=r"row 1"):
+        sketchsort.search(X, ham_dist=1, num_blocks=4, num_chunks=3, centering=False)
+
+
+def test_rejects_nan_row_with_centering():
+    # With centering on, the NaN in row 1 contaminates the column mean, so
+    # every row's centered value in that column becomes NaN too -- the
+    # error fires on row 0 (the first row checked), not row 1. This pins
+    # that centering-specific behavior rather than a specific row number.
+    X = np.array(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [np.nan, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    with pytest.raises(ValueError, match=r"after centering"):
+        sketchsort.search(X, ham_dist=1, num_blocks=4, num_chunks=3, centering=True)
+
+
+def test_auto_mode_combination_fix_pin(capfd):
+    # Pins auto mode's parameter choice at cos_dist=0.35 to the *fixed*
+    # combination() (see CLAUDE.md's combination() gotcha): the old
+    # integer-division bug picked hamDist=8/numBlocks=11/numChunks=20 for
+    # missing_ratio=0.0001; the fix picks hamDist=7/numBlocks=10/
+    # numChunks=25, which meets the same recall guarantee more efficiently.
+    # This test fails against the pre-fix combination().
+    X = np.eye(4, dtype=np.float32)
+    sketchsort.search(X, cos_dist=0.35, seed=0, verbose=True)
+    out = capfd.readouterr().out
+    assert "hamming distance threshold: 7" in out
+    assert "number of blocks: 10" in out
+    assert "number of chunks: 25" in out

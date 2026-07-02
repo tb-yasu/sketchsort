@@ -16,6 +16,8 @@ is given, the library uses the `missing_ratio` knob to pick those internally
 values are used and `missing_ratio` is ignored.
 """
 
+from typing import Optional
+
 from ._core import search        as _search_core
 from ._core import run_from_file as _run_from_file_core
 
@@ -37,13 +39,18 @@ def _resolve_auto(ham_dist, num_blocks, num_chunks):
     return ham_dist is None and num_blocks is None and num_chunks is None
 
 
+def _validate_seed(seed):
+    if not (0 <= seed < 2**32):
+        raise ValueError(f"seed must satisfy 0 <= seed < 2**32, got {seed}")
+
+
 def search(
     X,
     *,
     cos_dist: float = 0.01,
-    ham_dist: int = None,
-    num_blocks: int = None,
-    num_chunks: int = None,
+    ham_dist: Optional[int] = None,
+    num_blocks: Optional[int] = None,
+    num_chunks: Optional[int] = None,
     missing_ratio: float = 0.0001,
     centering: bool = False,
     seed: int = 0,
@@ -82,6 +89,7 @@ def search(
     -------
     ndarray with dtype [('id1', '<u4'), ('id2', '<u4'), ('cos_dist', '<f4')]
     """
+    _validate_seed(seed)
     auto = _resolve_auto(ham_dist, num_blocks, num_chunks)
     return _search_core(
         X,
@@ -102,9 +110,9 @@ def run_from_file(
     output_path: str,
     *,
     cos_dist: float = 0.01,
-    ham_dist: int = None,
-    num_blocks: int = None,
-    num_chunks: int = None,
+    ham_dist: Optional[int] = None,
+    num_blocks: Optional[int] = None,
+    num_chunks: Optional[int] = None,
     missing_ratio: float = 0.0001,
     centering: bool = False,
     seed: int = 0,
@@ -114,6 +122,7 @@ def run_from_file(
     'id1 id2 cos_dist' triples to `output_path`. Auto / manual selection
     follows the same rule as `search()`.
     """
+    _validate_seed(seed)
     auto = _resolve_auto(ham_dist, num_blocks, num_chunks)
     _run_from_file_core(
         input_path    = input_path,

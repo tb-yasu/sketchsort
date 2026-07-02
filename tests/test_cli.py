@@ -54,3 +54,17 @@ def test_cli_reports_missing_input(tmp_path):
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode != 0
     assert "sketchsort:" in result.stderr
+
+
+def test_cli_rejects_negative_seed(tmp_path):
+    out_path = tmp_path / "out.txt"
+    cmd = _resolve_script() + [
+        "-cosdist", "0.01",
+        "-seed", "-1",
+        SAMPLE,
+        str(out_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 1
+    assert "sketchsort:" in result.stderr
+    assert "Traceback" not in result.stderr

@@ -26,6 +26,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
@@ -45,9 +46,10 @@ wheel.packages = ["python/sketchsort"]
 cmake.version = ">=3.20"
 build-dir = "build/{wheel_tag}"
 
-# sdist contents are determined by scikit-build-core. With no git repo, it
-# falls back to os.walk filtered by .gitignore (we ship one) plus the
-# explicit exclude list below as a belt-and-braces fallback.
+# sdist contents are determined by scikit-build-core. Since this tree is a
+# git repository, it uses the git index (respecting .gitignore) to decide
+# what to include; the explicit exclude list below is a belt-and-braces
+# fallback on top of that.
 sdist.exclude = [
   "/build",
   "/build_*",

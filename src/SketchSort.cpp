@@ -45,7 +45,15 @@ void SketchSort::readFeature(const char *fname) {
   dim             = 0;
   float val       = 0.f;
   std::string line;
+  unsigned int lineNo = 0;
   while (std::getline(ifs, line)) {
+    ++lineNo;
+    if (line.find_first_not_of(" \t\r\n\v\f") == std::string::npos) {
+      std::ostringstream msg;
+      msg << "line " << lineNo << " is empty or contains only whitespace";
+      throw std::runtime_error(msg.str());
+    }
+
     fvs.resize(fvs.size() + 1);
     boost::numeric::ublas::vector<float> &fv = fvs[fvs.size() - 1];
     uint32_t counter = 0;
@@ -53,7 +61,18 @@ void SketchSort::readFeature(const char *fname) {
     if (dim != 0) {
       fv.resize(dim);
       while (is >> val) {
+	if (counter >= dim) {
+	  std::ostringstream msg;
+	  msg << "line " << lineNo << " has more than " << dim
+	      << " values, expected dimension " << dim;
+	  throw std::runtime_error(msg.str());
+	}
 	fv[counter++]= val;
+      }
+      if (!is.eof()) {
+	std::ostringstream msg;
+	msg << "line " << lineNo << " contains a non-numeric token";
+	throw std::runtime_error(msg.str());
       }
       if (counter !=  dim) {
 	std::ostringstream msg;
@@ -69,8 +88,17 @@ void SketchSort::readFeature(const char *fname) {
 	fv[counter] = val;
 	counter++;
       }
+      if (!is.eof()) {
+	std::ostringstream msg;
+	msg << "line " << lineNo << " contains a non-numeric token";
+	throw std::runtime_error(msg.str());
+      }
       dim = counter;
     }
+  }
+
+  if (fvs.empty()) {
+    throw std::runtime_error("input file contains no data rows");
   }
 }
 
@@ -332,7 +360,7 @@ inline void SketchSort::report(std::vector<uint8_t*> &sig, int l, int r, params 
 	  param.pairs->push_back(pr);
 	}
 	if (param.os) {
-	  (*param.os) << param.ids[i] << " " << param.ids[j] << " " << cosDist << std::endl;
+	  (*param.os) << param.ids[i] << " " << param.ids[j] << " " << cosDist << "\n";
 	}
       }
     }
@@ -360,7 +388,7 @@ void SketchSort::multi_classification(std::vector<uint8_t*> &sig, int maxind, in
 double combination(int n, int m) {
   double sum = 1.0;
   for (int i = 0; i < m; i++) {
-    sum *= (n-i)/(m-i);
+    sum *= static_cast<double>(n - i) / static_cast<double>(m - i);
   }
   return sum;
 }
@@ -374,7 +402,7 @@ double SketchSort::calcMissingEdgeRatio(params &param) {
   return pow(1.0 - sum, param.numchunks);
 }
 
-void SketchSort::preComputeNorms() {
+void SketchSort::preComputeNorms(bool centered) {
   norms.resize(fvs.size());
   float sum;
   for (size_t i = 0; i < fvs.size(); i++) {
@@ -382,6 +410,13 @@ void SketchSort::preComputeNorms() {
     sum = 0.f;
     for (size_t j = 0; j < fv.size(); j++) {
       sum += pow(fv[j], 2);
+    }
+    if (!(std::isfinite(sum) && sum > 0.f)) {
+      std::ostringstream msg;
+      msg << "row " << i << " has a zero or non-finite norm"
+          << (centered ? " (after centering)" : "")
+          << "; cannot compute a cosine distance for it";
+      throw std::invalid_argument(msg.str());
     }
     norms[i] = 1.f/sqrt(sum);
   }
@@ -411,6 +446,11 @@ void SketchSort::runCore(params &param) {
   numHamDist = 0;
 
   if (param.autoFlag) {
+    if (!(param.missingratio > 0.f && param.missingratio < 1.f)) {
+      std::ostringstream msg;
+      msg << "missing_ratio must be in (0, 1), got " << param.missingratio;
+      throw std::invalid_argument(msg.str());
+    }
     if (param.verbose) std::cerr << "deciding parameters such that the missing edge ratio is no more than " << param.missingratio << std::endl;
     decideParameters(param.missingratio, param);
     if (param.verbose) {
@@ -420,6 +460,43 @@ void SketchSort::runCore(params &param) {
       std::cout << "number of chunks: "  << param.numchunks << std::endl;
       std::cout << std::endl;
     }
+  }
+
+  if (param.numchunks < 1) {
+    throw std::invalid_argument("num_chunks must be >= 1");
+  }
+  if (param.numchunks > (std::numeric_limits<unsigned int>::max)() / param.projectDim) {
+    std::ostringstream msg;
+    msg << "num_chunks (" << param.numchunks << ") is too large: "
+        << param.projectDim << " * num_chunks would overflow";
+    throw std::invalid_argument(msg.str());
+  }
+  if (param.numblocks < 1) {
+    std::ostringstream msg;
+    msg << "num_blocks must be >= 1, got " << param.numblocks;
+    throw std::invalid_argument(msg.str());
+  }
+  if (param.numblocks > param.projectDim) {
+    std::ostringstream msg;
+    if (param.autoFlag) {
+      msg << "cos_dist is too large: auto mode selected num_blocks=" << param.numblocks
+          << ", which exceeds the maximum of " << param.projectDim << ". "
+          << "Lower cos_dist or specify ham_dist/num_blocks/num_chunks manually.";
+    } else {
+      msg << "num_blocks must be <= " << param.projectDim << ", got " << param.numblocks;
+    }
+    throw std::invalid_argument(msg.str());
+  }
+  if (param.chunk_dist >= param.numblocks) {
+    std::ostringstream msg;
+    msg << "ham_dist (" << param.chunk_dist << ") must be less than num_blocks ("
+        << param.numblocks << ")";
+    throw std::invalid_argument(msg.str());
+  }
+  if (!(param.cosDist >= 0.f && param.cosDist <= 2.f)) {
+    std::ostringstream msg;
+    msg << "cos_dist must be in [0, 2], got " << param.cosDist;
+    throw std::invalid_argument(msg.str());
   }
 
   if (param.verbose) std::cout << "missing edge ratio:" << calcMissingEdgeRatio(param) << std::endl;
@@ -436,7 +513,7 @@ void SketchSort::runCore(params &param) {
   }
 
   double totalstart = clock();
-  preComputeNorms();
+  preComputeNorms(param.centering);
 
   param.counter = new unsigned int[num_char];
 
@@ -524,12 +601,6 @@ void SketchSort::run(const char *fname, const char *oname,
   param.verbose      = _verbose;
   num_char           = 2;
 
-  std::ofstream ofs(oname);
-  if (!ofs) {
-    throw std::runtime_error(std::string("cannot open output file: ") + oname);
-  }
-  param.os = &ofs;
-
   if (param.verbose) std::cerr << "start reading" << std::endl;
   double readstart = clock();
   readFeature(fname);
@@ -538,6 +609,12 @@ void SketchSort::run(const char *fname, const char *oname,
     std::cerr << "end reading" << std::endl;
     std::cout << "readtime:" << (readend - readstart)/(double)CLOCKS_PER_SEC << std::endl;
   }
+
+  std::ofstream ofs(oname);
+  if (!ofs) {
+    throw std::runtime_error(std::string("cannot open output file: ") + oname);
+  }
+  param.os = &ofs;
 
   runCore(param);
 

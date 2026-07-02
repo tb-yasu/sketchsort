@@ -26,9 +26,11 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <cerrno>
+#include <climits>
 
 /* Globals */
-void usage();
+void usage(int exit_code);
 void version();
 void parse_parameters (int argc, char **argv);
 
@@ -65,7 +67,7 @@ void version(){
             << "Written by Yasuo Tabei" << std::endl << std::endl;
 }
 
-void usage(){
+void usage(int exit_code){
   std::cerr << std::endl
        << "Usage: sketchsort [OPTION]... INFILE OUTFILE" << std::endl << std::endl
        << "       where [OPTION]...  is a list of zero or more optional arguments" << std::endl
@@ -86,17 +88,58 @@ void usage(){
        << "       -centering" << std::endl
        << "       -seed [random seed]" << std::endl
        << "       (default: " << seed << ")" << std::endl
+       << "       -h, --help" << std::endl
        << std::endl;
-  exit(0);
+  exit(exit_code);
 }
 
+namespace {
+
+int parse_int_arg(const char *flag, const char *s) {
+  errno = 0;
+  char *endptr = nullptr;
+  long v = strtol(s, &endptr, 10);
+  if (endptr == s || *endptr != '\0' || errno == ERANGE || v < INT_MIN || v > INT_MAX) {
+    std::cerr << "sketchsort: invalid integer value \"" << s << "\" for " << flag << std::endl;
+    exit(1);
+  }
+  return static_cast<int>(v);
+}
+
+float parse_float_arg(const char *flag, const char *s) {
+  errno = 0;
+  char *endptr = nullptr;
+  float v = strtof(s, &endptr);
+  if (endptr == s || *endptr != '\0' || errno == ERANGE) {
+    std::cerr << "sketchsort: invalid number \"" << s << "\" for " << flag << std::endl;
+    exit(1);
+  }
+  return v;
+}
+
+unsigned int parse_uint_arg(const char *flag, const char *s) {
+  errno = 0;
+  char *endptr = nullptr;
+  unsigned long v = strtoul(s, &endptr, 10);
+  if (endptr == s || *endptr != '\0' || errno == ERANGE || v > (std::numeric_limits<unsigned int>::max)()) {
+    std::cerr << "sketchsort: invalid unsigned integer value \"" << s << "\" for " << flag << std::endl;
+    exit(1);
+  }
+  return static_cast<unsigned int>(v);
+}
+
+} // namespace
+
 void parse_parameters (int argc, char **argv){
-  if (argc == 1) usage();
+  if (argc == 1) usage(1);
   int argno;
   for (argno = 1; argno < argc; argno++){
     if (argv[argno][0] == '-'){
       if      (!strcmp (argv[argno], "-version")){
-	version();
+	exit(0);
+      }
+      else if (!strcmp (argv[argno], "-h") || !strcmp (argv[argno], "--help")) {
+	usage(0);
       }
       else if (!strcmp (argv[argno], "-auto")) {
 	autoFlag = true;
@@ -105,38 +148,66 @@ void parse_parameters (int argc, char **argv){
 	centering = true;
       }
       else if (!strcmp (argv[argno], "-numblocks")) {
-	if (argno == argc - 1) std::cerr << "Must specify minimum support after -numblocks" << std::endl;
-	numblocks = atoi(argv[++argno]);
+	if (argno == argc - 1) {
+	  std::cerr << "sketchsort: must specify a value after -numblocks" << std::endl;
+	  exit(1);
+	}
+	numblocks = parse_int_arg("-numblocks", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-hamdist")) {
-	if (argno == argc - 1) std::cerr << "Must specify hamming distance threshold after -hamdist" << std::endl;
-	hamDist = atoi(argv[++argno]);
+	if (argno == argc - 1) {
+	  std::cerr << "sketchsort: must specify a value after -hamdist" << std::endl;
+	  exit(1);
+	}
+	hamDist = parse_int_arg("-hamdist", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-cosdist")) {
-	if (argno == argc - 1) std::cerr << "Must specify cosine distance threshold size after -cosdist" << std::endl;
-	cosDist = atof(argv[++argno]);
+	if (argno == argc - 1) {
+	  std::cerr << "sketchsort: must specify a value after -cosdist" << std::endl;
+	  exit(1);
+	}
+	cosDist = parse_float_arg("-cosdist", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-numchunks")) {
-	if (argno == argc - 1) std::cerr << "Must specify number of chunks after -numchunks" << std::endl;
-	numchunks = atoi(argv[++argno]);
+	if (argno == argc - 1) {
+	  std::cerr << "sketchsort: must specify a value after -numchunks" << std::endl;
+	  exit(1);
+	}
+	numchunks = parse_int_arg("-numchunks", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-missingratio")) {
-	if (argno == argc - 1) std::cerr << "Must specify missing edge ratio after -missingratio" << std::endl;
-	missingratio = atof(argv[++argno]);
+	if (argno == argc - 1) {
+	  std::cerr << "sketchsort: must specify a value after -missingratio" << std::endl;
+	  exit(1);
+	}
+	missingratio = parse_float_arg("-missingratio", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-seed")) {
-	if (argno == argc - 1) std::cerr << "Must specify random seed after -seed" << std::endl;
-	seed = static_cast<unsigned int>(strtoul(argv[++argno], nullptr, 10));
+	if (argno == argc - 1) {
+	  std::cerr << "sketchsort: must specify a value after -seed" << std::endl;
+	  exit(1);
+	}
+	seed = parse_uint_arg("-seed", argv[++argno]);
       }
       else {
-	usage();
+	std::cerr << "sketchsort: unknown option " << argv[argno] << std::endl;
+	usage(1);
       }
     } else {
       break;
     }
   }
-  if (argno > argc)
-    usage();
+
+  if (argc - argno != 2) {
+    if (argc - argno < 2) {
+      std::cerr << "sketchsort: missing "
+                << (argc - argno == 0 ? "INFILE and OUTFILE" : "OUTFILE") << std::endl;
+    } else {
+      std::cerr << "sketchsort: too many arguments after OUTFILE "
+                   "(options must precede INFILE)" << std::endl;
+    }
+    usage(1);
+  }
 
   fname = argv[argno];
   oname = argv[argno + 1];

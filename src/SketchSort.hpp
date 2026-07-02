@@ -129,7 +129,7 @@ class SketchSort {
   void readFeature(const char *fname);
   void setFeaturesFromRaw(const float *data, std::size_t n_rows, std::size_t n_cols);
   void centeringData();
-  void preComputeNorms();
+  void preComputeNorms(bool centered);
   void runCore(params &param);
   int projectVectors(unsigned int projectDim, std::vector<uint8_t*> &sig, params &param);
   void report(std::vector<uint8_t*> &sig, int l, int r, params &param);

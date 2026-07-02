@@ -94,3 +94,51 @@ def test_cpp_cli_matches_python_run_from_file(tmp_path):
         check=True, capture_output=True,
     )
     assert filecmp.cmp(py_out, cpp_out, shallow=False)
+
+
+@needs_cpp
+def test_cpp_cli_missing_outfile_exits_cleanly():
+    """OUTFILE omitted used to segfault (exit 139); it must now exit 1."""
+    result = subprocess.run(
+        [CPP_BIN, "-cosdist", "0.01", "-seed", "42", SAMPLE],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1
+    assert result.stderr.strip() != ""
+
+
+@needs_cpp
+def test_cpp_cli_trailing_flag_without_value_exits_cleanly():
+    """A value-taking flag with nothing after it used to segfault via atoi(NULL)."""
+    result = subprocess.run(
+        [CPP_BIN, "-seed", "42", "-cosdist"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1
+
+
+@needs_cpp
+def test_cpp_cli_non_numeric_flag_value_exits_cleanly(tmp_path):
+    out = tmp_path / "out.txt"
+    result = subprocess.run(
+        [CPP_BIN, "-hamdist", "abc", "-seed", "42", SAMPLE, str(out)],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1
+
+
+@needs_cpp
+def test_cpp_cli_hamdist_not_less_than_numblocks_exits_cleanly(tmp_path):
+    """ham_dist >= num_blocks used to silently drop every pair via unsigned underflow."""
+    out = tmp_path / "out.txt"
+    result = subprocess.run(
+        [CPP_BIN, "-hamdist", "5", "-numblocks", "4", "-seed", "42", SAMPLE, str(out)],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1
+
+
+@needs_cpp
+def test_cpp_cli_version_exits_zero():
+    result = subprocess.run([CPP_BIN, "-version"], capture_output=True, text=True)
+    assert result.returncode == 0

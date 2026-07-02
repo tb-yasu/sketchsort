@@ -70,7 +70,7 @@ def main(argv=None) -> int:
             seed=args.seed,
             verbose=not args.quiet,
         )
-    except (RuntimeError, OSError, ValueError) as e:
+    except (RuntimeError, OSError, ValueError, TypeError, OverflowError) as e:
         print(f"sketchsort: {e}", file=sys.stderr)
         return 1
     return 0

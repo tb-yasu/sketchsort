@@ -20,10 +20,10 @@ See the Python API section below for details.
 pip install sketchsort
 ```
 
-Wheels are provided for CPython 3.9–3.13 on Linux (x86_64) and macOS arm64
-(Apple Silicon). Intel macOS and Windows are not yet provided as wheels;
-on those platforms `pip install sketchsort` will fall back to a source
-build (requires a C++17 compiler and CMake).
+Wheels are provided for CPython 3.9–3.13 on Linux (x86_64), macOS arm64
+(Apple Silicon), and Windows (x86_64). Intel macOS is not yet provided as
+a wheel; on that platform `pip install sketchsort` will fall back to a
+source build (requires a C++17 compiler and CMake).
 
 ## Python API
 
@@ -109,6 +109,12 @@ sketchsort.run_from_file("input.txt", "output.txt", cos_dist=0.01, seed=42)
 The input file is whitespace-separated float vectors, one per line, no ID
 column. The output file is `id1 id2 cos_dist` triples.
 
+Every line must carry exactly as many numeric tokens as the first line
+(that count becomes the file's dimension). Blank or whitespace-only
+lines, non-numeric tokens, lines with too many values, and a completely
+empty file are all rejected with an error naming the offending line
+rather than being silently skipped or truncated.
+
 ## Command line
 
 Installing the package also installs a `sketchsort` console script. It
@@ -137,6 +143,39 @@ returning. For large inputs at loose thresholds the result can be very
 large (tens of millions of pairs are realistic). If memory is a concern,
 use `sketchsort.run_from_file(...)` instead — it streams pairs to disk
 while the algorithm runs.
+
+## Unreleased
+
+Behavior changes from hardening the C++ core and CLI against invalid
+input (no version bump yet):
+
+- **Invalid input now raises instead of silently producing wrong output.**
+  Zero-norm or non-finite (NaN/Inf) rows, out-of-range parameters
+  (`cos_dist` outside `[0, 2]`, `missing_ratio` outside `(0, 1)` in auto
+  mode, `ham_dist >= num_blocks`, `num_blocks` outside `[1, 32]`,
+  `num_chunks < 1`), and malformed input-file lines (blank/whitespace-only
+  lines, non-numeric tokens, lines with more values than the file's
+  dimension, or a completely empty input file) now raise `ValueError` /
+  `RuntimeError` from Python (`std::invalid_argument` / `std::runtime_error`
+  from the C++ core) instead of being silently dropped or corrupting
+  output.
+- **C++ CLI exit codes.** A missing `OUTFILE`, a value-taking flag with no
+  value, a non-numeric flag value, or extra positional arguments after
+  `OUTFILE` now print an error to stderr and exit with status 1 instead of
+  crashing or silently continuing with garbage arguments. `-version` and
+  the new `-h`/`--help` exit 0 immediately instead of falling through to a
+  (previously crash-prone) attempt to run with missing file arguments.
+  Options must precede `INFILE`/`OUTFILE`; anything after them is now a
+  positional-argument error rather than being silently ignored.
+- **`combination()` integer-division fix.** The internal binomial
+  coefficient helper used by auto mode's parameter search performed
+  integer division and underestimated `C(n, m)` for `m >= 3`. Auto mode
+  now picks more accurate — typically smaller and more efficient —
+  `ham_dist` / `num_blocks` / `num_chunks` when `cos_dist` is roughly
+  `>= 0.1`; the `missing_ratio` recall guarantee holds either way. Smaller
+  `cos_dist` values, including the `golden/` fixture (`cos_dist=0.01`),
+  are unaffected — the search already converged at `ham_dist <= 2`, where
+  the old and new `combination()` agree exactly.
 
 ## 0.1.0 release notes (based on upstream 0.0.8)
 
