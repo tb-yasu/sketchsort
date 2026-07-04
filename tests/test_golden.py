@@ -5,7 +5,7 @@
 The golden file is generated on one platform (macOS arm64, CMake Release).
 On other platforms — Linux x86_64, Windows — algorithmic determinism holds
 for everything *except* the final `cos_dist <= threshold` comparison: libm
-and FMA differences shift checkCos() by a few ULPs, so pairs whose true
+and FMA differences shift calc_cos_dist() by a few ULPs, so pairs whose true
 cos_dist is right at the boundary may be admitted on one OS and rejected on
 another. The expected divergence is ~0 to ~few dozen out of ~132 000.
 
@@ -56,7 +56,7 @@ def test_pair_set_close_to_golden(tmp_path):
     union      = got_set | golden_set
 
     # Boundary pairs (cos_dist ≈ 0.01) can flip across platforms due to
-    # libm/FMA differences in checkCos(). Cap at 0.1% of |union| or 100,
+    # libm/FMA differences in calc_cos_dist(). Cap at 0.1% of |union| or 100,
     # whichever is larger — well above any real expected drift.
     allowed = max(100, int(len(union) * 0.001))
     assert len(sym_diff) <= allowed, (
@@ -78,7 +78,7 @@ def test_cos_dist_close_to_golden_on_intersection(tmp_path):
     golden_arr = np.array([golden_d[k] for k in common], dtype=np.float64)
 
     # rtol / atol intentionally generous: golden cos_dist is float32 round-
-    # tripped through text, and the OS may compute checkCos slightly
+    # tripped through text, and the OS may compute calc_cos_dist slightly
     # differently. We only check magnitude is the same.
     np.testing.assert_allclose(
         got_arr, golden_arr,

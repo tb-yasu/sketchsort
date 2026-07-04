@@ -17,7 +17,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_library(sketchsort_core STATIC
-    src/SketchSort.cpp
+    src/sketch_sort.cpp
 )
 
 target_include_directories(sketchsort_core
@@ -26,7 +26,7 @@ target_include_directories(sketchsort_core
 
 # Vendored Boost (2011) ships with deprecated constructs; silence the noise.
 # This is project-wide acceptable here because the only non-Boost translation
-# unit is SketchSort.cpp itself, which we keep clean.
+# unit is sketch_sort.cpp itself, which we keep clean.
 target_compile_options(sketchsort_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-deprecated-declarations>
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-deprecated>
@@ -52,7 +52,7 @@ if(SKETCHSORT_BUILD_PYTHON)
 endif()
 
 if(SKETCHSORT_BUILD_CLI)
-    add_executable(sketchsort_cli src/Main.cpp)
+    add_executable(sketchsort_cli src/main.cpp)
     target_link_libraries(sketchsort_cli PRIVATE sketchsort_core)
     set_target_properties(sketchsort_cli PROPERTIES OUTPUT_NAME sketchsort)
 endif()

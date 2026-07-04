@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <utility>
 
-#include "SketchSort.hpp"
+#include "sketch_sort.hpp"
 
 namespace py = pybind11;
 
@@ -35,9 +35,9 @@ static py::array search_py(
     const auto N = static_cast<std::size_t>(X.shape(0));
     const auto D = static_cast<std::size_t>(X.shape(1));
 
-    std::vector<sketchsort_api::Pair> pairs;
+    std::vector<sketchsort::Pair> pairs;
     {
-        SketchSort ss;
+        sketchsort::SketchSort ss;
         py::gil_scoped_release release;
         ss.search(X.data(), N, D,
                   num_blocks, ham_dist, cos_dist, num_chunks,
@@ -45,10 +45,10 @@ static py::array search_py(
                   pairs);
     }
 
-    py::array_t<sketchsort_api::Pair> out(static_cast<py::ssize_t>(pairs.size()));
+    py::array_t<sketchsort::Pair> out(static_cast<py::ssize_t>(pairs.size()));
     if (!pairs.empty()) {
         std::memcpy(out.mutable_data(), pairs.data(),
-                    pairs.size() * sizeof(sketchsort_api::Pair));
+                    pairs.size() * sizeof(sketchsort::Pair));
     }
     return std::move(out);
 }
@@ -66,7 +66,7 @@ static void run_from_file_py(
     unsigned int seed,
     bool verbose)
 {
-    SketchSort ss;
+    sketchsort::SketchSort ss;
     py::gil_scoped_release release;
     ss.run(input_path.c_str(), output_path.c_str(),
            num_blocks, ham_dist, cos_dist, num_chunks,
@@ -76,7 +76,7 @@ static void run_from_file_py(
 PYBIND11_MODULE(_core, m) {
     m.doc() = "SketchSort: fast all-pairs cosine-similarity search via random projection sketches.";
 
-    PYBIND11_NUMPY_DTYPE(sketchsort_api::Pair, id1, id2, cos_dist);
+    PYBIND11_NUMPY_DTYPE(sketchsort::Pair, id1, id2, cos_dist);
 
     m.def("search", &search_py,
           py::arg("X"),

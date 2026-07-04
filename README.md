@@ -167,6 +167,12 @@ input (no version bump yet):
   (previously crash-prone) attempt to run with missing file arguments.
   Options must precede `INFILE`/`OUTFILE`; anything after them is now a
   positional-argument error rather than being silently ignored.
+- **C++ CLI: negative parameter values rejected at parse time.**
+  `-hamdist` / `-numblocks` / `-numchunks` are now parsed as unsigned
+  integers (matching `-seed`), so a negative value such as `-hamdist -1`
+  exits with a clear `invalid unsigned integer value` error instead of
+  silently wrapping to a huge value and failing later with a confusing
+  out-of-range message.
 - **`combination()` integer-division fix.** The internal binomial
   coefficient helper used by auto mode's parameter search performed
   integer division and underestimated `C(n, m)` for `m >= 3`. Auto mode
@@ -176,6 +182,15 @@ input (no version bump yet):
   `cos_dist` values, including the `golden/` fixture (`cos_dist=0.01`),
   are unaffected — the search already converged at `ham_dist <= 2`, where
   the old and new `combination()` agree exactly.
+
+Internal (no behavior change — output is byte-identical):
+
+- The C++ sources were renamed to snake_case (`src/sketch_sort.hpp`,
+  `src/sketch_sort.cpp`, `src/main.cpp`), all C++ code now lives in
+  `namespace sketchsort`, and internal identifiers were unified to one
+  naming convention (PascalCase types, snake_case functions/variables).
+  CLI flags, the Python API, the output format, and the legacy
+  `cd src && make` build are all unchanged.
 
 ## 0.1.0 release notes (based on upstream 0.0.8)
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /*
- * Main.cpp
+ * main.cpp
  * Copyright (c) 2011 Yasuo Tabei All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person
@@ -22,27 +22,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "SketchSort.hpp"
+#include "sketch_sort.hpp"
 
 #include <iostream>
 #include <cstdlib>
 #include <cerrno>
 #include <climits>
 
+using sketchsort::SketchSort;
+
 /* Globals */
 void usage(int exit_code);
 void version();
 void parse_parameters (int argc, char **argv);
 
-char *fname, *oname;
-unsigned int hamDist      = 1;
-unsigned int numblocks    = 4;
-unsigned int numchunks    = 3;
-float        cosDist      = 0.01;
-bool         autoFlag     = false;
-float        missingratio = 0.0001;
-bool         centering    = false;
-unsigned int seed         = 0;
+char *input_path, *output_path;
+unsigned int ham_dist      = 1;
+unsigned int num_blocks    = 4;
+unsigned int num_chunks    = 3;
+float        cos_dist      = 0.01;
+bool         auto_mode     = false;
+float        missing_ratio = 0.0001;
+bool         centering     = false;
+unsigned int seed          = 0;
 
 int main(int argc, char **argv)
 {
@@ -52,8 +54,8 @@ int main(int argc, char **argv)
     parse_parameters(argc, argv);
 
     SketchSort sketchsort;
-    sketchsort.run(fname, oname, numblocks, hamDist, cosDist,
-                   numchunks, autoFlag, missingratio, centering, seed);
+    sketchsort.run(input_path, output_path, num_blocks, ham_dist, cos_dist,
+                   num_chunks, auto_mode, missing_ratio, centering, seed);
   } catch (const std::exception &e) {
     std::cerr << "sketchsort: " << e.what() << std::endl;
     return 1;
@@ -75,16 +77,16 @@ void usage(int exit_code){
        << "             OUTFILE      is the name of an output file" << std::endl << std::endl
        << "Additional arguments (input and output files may be specified):" << std::endl
        << "       -hamdist [maximum hamming distance]" << std::endl
-       << "       (default: " << hamDist << ")" << std::endl
+       << "       (default: " << ham_dist << ")" << std::endl
        << "       -numblocks [the number of blocks]" << std::endl
-       << "       (default: " << numblocks << ")" << std::endl
+       << "       (default: " << num_blocks << ")" << std::endl
        << "       -cosdist [maximum cosine distance]" << std::endl
-       << "       (default: " << cosDist << ")" << std::endl
+       << "       (default: " << cos_dist << ")" << std::endl
        << "       -numchunks [the number of chunks]" << std::endl
-       << "       (default: " << numchunks << ")" << std::endl
+       << "       (default: " << num_chunks << ")" << std::endl
        << "       -auto " << std::endl
        << "       -missingratio " << std::endl
-       << "       (default: " << missingratio << ")" << std::endl
+       << "       (default: " << missing_ratio << ")" << std::endl
        << "       -centering" << std::endl
        << "       -seed [random seed]" << std::endl
        << "       (default: " << seed << ")" << std::endl
@@ -131,7 +133,7 @@ void parse_parameters (int argc, char **argv){
 	usage(0);
       }
       else if (!strcmp (argv[argno], "-auto")) {
-	autoFlag = true;
+	auto_mode = true;
       }
       else if (!strcmp (argv[argno], "-centering")) {
 	centering = true;
@@ -141,35 +143,35 @@ void parse_parameters (int argc, char **argv){
 	  std::cerr << "sketchsort: must specify a value after -numblocks" << std::endl;
 	  exit(1);
 	}
-	numblocks = parse_uint_arg("-numblocks", argv[++argno]);
+	num_blocks = parse_uint_arg("-numblocks", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-hamdist")) {
 	if (argno == argc - 1) {
 	  std::cerr << "sketchsort: must specify a value after -hamdist" << std::endl;
 	  exit(1);
 	}
-	hamDist = parse_uint_arg("-hamdist", argv[++argno]);
+	ham_dist = parse_uint_arg("-hamdist", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-cosdist")) {
 	if (argno == argc - 1) {
 	  std::cerr << "sketchsort: must specify a value after -cosdist" << std::endl;
 	  exit(1);
 	}
-	cosDist = parse_float_arg("-cosdist", argv[++argno]);
+	cos_dist = parse_float_arg("-cosdist", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-numchunks")) {
 	if (argno == argc - 1) {
 	  std::cerr << "sketchsort: must specify a value after -numchunks" << std::endl;
 	  exit(1);
 	}
-	numchunks = parse_uint_arg("-numchunks", argv[++argno]);
+	num_chunks = parse_uint_arg("-numchunks", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-missingratio")) {
 	if (argno == argc - 1) {
 	  std::cerr << "sketchsort: must specify a value after -missingratio" << std::endl;
 	  exit(1);
 	}
-	missingratio = parse_float_arg("-missingratio", argv[++argno]);
+	missing_ratio = parse_float_arg("-missingratio", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-seed")) {
 	if (argno == argc - 1) {
@@ -198,6 +200,6 @@ void parse_parameters (int argc, char **argv){
     usage(1);
   }
 
-  fname = argv[argno];
-  oname = argv[argno + 1];
+  input_path = argv[argno];
+  output_path = argv[argno + 1];
 }

@@ -6,8 +6,8 @@ CXXFLAGS = -std=c++17 -O3 -DNDEBUG -Wno-deprecated -Wno-deprecated-declarations 
 LINKFLAGS = -lm
 
 SRCS = \
-	Main.cpp \
-	SketchSort.cpp \
+	main.cpp \
+	sketch_sort.cpp \
 
 OBJS = $(SRCS:%.cpp=%.o)
 

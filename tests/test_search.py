@@ -171,9 +171,9 @@ def test_rejects_nan_row_with_centering():
 def test_auto_mode_combination_fix_pin(capfd):
     # Pins auto mode's parameter choice at cos_dist=0.35 to the *fixed*
     # combination() (see CLAUDE.md's combination() gotcha): the old
-    # integer-division bug picked hamDist=8/numBlocks=11/numChunks=20 for
-    # missing_ratio=0.0001; the fix picks hamDist=7/numBlocks=10/
-    # numChunks=25, which meets the same recall guarantee more efficiently.
+    # integer-division bug picked ham_dist=8/num_blocks=11/num_chunks=20 for
+    # missing_ratio=0.0001; the fix picks ham_dist=7/num_blocks=10/
+    # num_chunks=25, which meets the same recall guarantee more efficiently.
     # This test fails against the pre-fix combination().
     X = np.eye(4, dtype=np.float32)
     sketchsort.search(X, cos_dist=0.35, seed=0, verbose=True)
