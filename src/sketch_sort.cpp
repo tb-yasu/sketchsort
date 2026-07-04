@@ -33,6 +33,23 @@ static inline uint8_t sign(T val) {
   return 0;
 }
 
+// Parse one whitespace-delimited token as a float. A failed `stream >> float`
+// may or may not set eofbit depending on the C++ standard library (libc++
+// scans hex-float chars, so line-final garbage like "abc" slipped past the
+// old `!is.eof()` check on some platforms); token-wise strtof parsing is
+// deterministic. Rejects trailing garbage, inf/nan, and overflow, matching
+// what num_get accepted.
+static float parse_float_token(const std::string &token, unsigned int line_no) {
+  char *end = nullptr;
+  float v = std::strtof(token.c_str(), &end);
+  if (end != token.c_str() + token.size() || !std::isfinite(v)) {
+    std::ostringstream msg;
+    msg << "line " << line_no << " contains a non-numeric token";
+    throw std::runtime_error(msg.str());
+  }
+  return v;
+}
+
 void SketchSort::read_features(const char *input_path) {
   std::ifstream ifs(input_path);
 
@@ -42,7 +59,6 @@ void SketchSort::read_features(const char *input_path) {
 
   feature_vectors_.clear();
   dim_            = 0;
-  float val       = 0.f;
   std::string line;
   unsigned int line_no = 0;
   while (std::getline(ifs, line)) {
@@ -57,21 +73,17 @@ void SketchSort::read_features(const char *input_path) {
     boost::numeric::ublas::vector<float> &vec = feature_vectors_[feature_vectors_.size() - 1];
     uint32_t num_vals = 0;
     std::istringstream is(line);
+    std::string token;
     if (dim_ != 0) {
       vec.resize(dim_);
-      while (is >> val) {
+      while (is >> token) {
 	if (num_vals >= dim_) {
 	  std::ostringstream msg;
 	  msg << "line " << line_no << " has more than " << dim_
 	      << " values, expected dimension " << dim_;
 	  throw std::runtime_error(msg.str());
 	}
-	vec[num_vals++]= val;
-      }
-      if (!is.eof()) {
-	std::ostringstream msg;
-	msg << "line " << line_no << " contains a non-numeric token";
-	throw std::runtime_error(msg.str());
+	vec[num_vals++] = parse_float_token(token, line_no);
       }
       if (num_vals !=  dim_) {
 	std::ostringstream msg;
@@ -82,15 +94,10 @@ void SketchSort::read_features(const char *input_path) {
       }
     }
     else {
-      while (is >> val) {
+      while (is >> token) {
 	vec.resize(num_vals + 1);
-	vec[num_vals] = val;
+	vec[num_vals] = parse_float_token(token, line_no);
 	num_vals++;
-      }
-      if (!is.eof()) {
-	std::ostringstream msg;
-	msg << "line " << line_no << " contains a non-numeric token";
-	throw std::runtime_error(msg.str());
       }
       dim_ = num_vals;
     }
