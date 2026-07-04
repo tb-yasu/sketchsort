@@ -35,9 +35,9 @@ void version();
 void parse_parameters (int argc, char **argv);
 
 char *fname, *oname;
-int          hamDist      = 1;
-int          numblocks    = 4;
-int          numchunks    = 3;
+unsigned int hamDist      = 1;
+unsigned int numblocks    = 4;
+unsigned int numchunks    = 3;
 float        cosDist      = 0.01;
 bool         autoFlag     = false;
 float        missingratio = 0.0001;
@@ -95,17 +95,6 @@ void usage(int exit_code){
 
 namespace {
 
-int parse_int_arg(const char *flag, const char *s) {
-  errno = 0;
-  char *endptr = nullptr;
-  long v = strtol(s, &endptr, 10);
-  if (endptr == s || *endptr != '\0' || errno == ERANGE || v < INT_MIN || v > INT_MAX) {
-    std::cerr << "sketchsort: invalid integer value \"" << s << "\" for " << flag << std::endl;
-    exit(1);
-  }
-  return static_cast<int>(v);
-}
-
 float parse_float_arg(const char *flag, const char *s) {
   errno = 0;
   char *endptr = nullptr;
@@ -152,14 +141,14 @@ void parse_parameters (int argc, char **argv){
 	  std::cerr << "sketchsort: must specify a value after -numblocks" << std::endl;
 	  exit(1);
 	}
-	numblocks = parse_int_arg("-numblocks", argv[++argno]);
+	numblocks = parse_uint_arg("-numblocks", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-hamdist")) {
 	if (argno == argc - 1) {
 	  std::cerr << "sketchsort: must specify a value after -hamdist" << std::endl;
 	  exit(1);
 	}
-	hamDist = parse_int_arg("-hamdist", argv[++argno]);
+	hamDist = parse_uint_arg("-hamdist", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-cosdist")) {
 	if (argno == argc - 1) {
@@ -173,7 +162,7 @@ void parse_parameters (int argc, char **argv){
 	  std::cerr << "sketchsort: must specify a value after -numchunks" << std::endl;
 	  exit(1);
 	}
-	numchunks = parse_int_arg("-numchunks", argv[++argno]);
+	numchunks = parse_uint_arg("-numchunks", argv[++argno]);
       }
       else if (!strcmp (argv[argno], "-missingratio")) {
 	if (argno == argc - 1) {

@@ -25,14 +25,10 @@
 #include "SketchSort.hpp"
 
 template<class T>
-inline uint8_t sign(T val) {
+static inline uint8_t sign(T val) {
   if (val > 0)
     return 1;
   return 0;
-}
-
-bool cmp(const std::pair<int, float> &p1, const std::pair<int, float> &p2) {
-  return p1.second < p2.second;
 }
 
 void SketchSort::readFeature(const char *fname) {
@@ -42,6 +38,7 @@ void SketchSort::readFeature(const char *fname) {
     throw std::runtime_error(std::string("cannot open input file: ") + fname);
   }
 
+  fvs.clear();
   dim             = 0;
   float val       = 0.f;
   std::string line;
@@ -180,7 +177,7 @@ int SketchSort::projectVectors(unsigned int projectDim, std::vector<uint8_t*> &s
 }
 */
 
-int SketchSort::projectVectors(unsigned int projectDim, std::vector<uint8_t*> &sig, params &param) {
+void SketchSort::projectVectors(unsigned int projectDim, std::vector<uint8_t*> &sig, params &param) {
   std::vector<float> randMat;
   p = new boost::pool<>(sizeof(uint8_t));
   sig.resize(fvs.size());
@@ -214,7 +211,6 @@ int SketchSort::projectVectors(unsigned int projectDim, std::vector<uint8_t*> &s
   param.seq_len = projectDim;
   param.num_seq = fvs.size();
 
-  return 1;
 }
 
 inline float SketchSort::checkCos(unsigned int id1, unsigned int id2) {
@@ -385,7 +381,7 @@ void SketchSort::multi_classification(std::vector<uint8_t*> &sig, int maxind, in
   }
 }
 
-double combination(int n, int m) {
+static double combination(int n, int m) {
   double sum = 1.0;
   for (int i = 0; i < m; i++) {
     sum *= static_cast<double>(n - i) / static_cast<double>(m - i);
@@ -441,7 +437,6 @@ void SketchSort::decideParameters(float _missingratio, params &param) {
 }
 
 void SketchSort::runCore(params &param) {
-  numSort    = 0;
   numCosDist = 0;
   numHamDist = 0;
 
@@ -577,6 +572,30 @@ void SketchSort::runCore(params &param) {
   delete[] param.pos;
 }
 
+params SketchSort::initParams(unsigned int _numblocks,
+                               unsigned int _dist,
+                               float        _cosDist,
+                               unsigned int _numchunks,
+                               bool         _autoFlag,
+                               float        _missingratio,
+                               bool         _centering,
+                               unsigned int _seed,
+                               bool         _verbose) {
+  params param;
+  param.numblocks    = _numblocks;
+  param.numchunks    = _numchunks;
+  param.chunk_dist   = _dist;
+  param.cosDist      = _cosDist;
+  param.projectDim   = kProjectDim;
+  param.autoFlag     = _autoFlag;
+  param.missingratio = _missingratio;
+  param.centering    = _centering;
+  param.seed         = _seed;
+  param.verbose      = _verbose;
+  num_char           = 2;
+  return param;
+}
+
 void SketchSort::run(const char *fname, const char *oname,
 		  unsigned int _numblocks,
 		  unsigned int _dist,
@@ -588,18 +607,9 @@ void SketchSort::run(const char *fname, const char *oname,
 		  unsigned int _seed,
 		  bool         _verbose)
 {
-  params param;
-  param.numblocks    = _numblocks;
-  param.numchunks    = _numchunks;
-  param.chunk_dist   = _dist;
-  param.cosDist      = _cosDist;
-  param.projectDim   = 32;
-  param.autoFlag     = _autoFlag;
-  param.missingratio = _missingratio;
-  param.centering    = _centering;
-  param.seed         = _seed;
-  param.verbose      = _verbose;
-  num_char           = 2;
+  params param = initParams(_numblocks, _dist, _cosDist, _numchunks,
+                             _autoFlag, _missingratio, _centering,
+                             _seed, _verbose);
 
   if (param.verbose) std::cerr << "start reading" << std::endl;
   double readstart = clock();
@@ -645,18 +655,9 @@ void SketchSort::search(const float *data, std::size_t n_rows, std::size_t n_col
     throw std::invalid_argument("number of rows exceeds uint32 id range");
   }
 
-  params param;
-  param.numblocks    = _numblocks;
-  param.numchunks    = _numchunks;
-  param.chunk_dist   = _dist;
-  param.cosDist      = _cosDist;
-  param.projectDim   = 32;
-  param.autoFlag     = _autoFlag;
-  param.missingratio = _missingratio;
-  param.centering    = _centering;
-  param.seed         = _seed;
-  param.verbose      = _verbose;
-  num_char           = 2;
+  params param = initParams(_numblocks, _dist, _cosDist, _numchunks,
+                             _autoFlag, _missingratio, _centering,
+                             _seed, _verbose);
 
   out.clear();
   param.pairs = &out;

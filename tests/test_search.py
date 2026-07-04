@@ -181,3 +181,31 @@ def test_auto_mode_combination_fix_pin(capfd):
     assert "hamming distance threshold: 7" in out
     assert "number of blocks: 10" in out
     assert "number of chunks: 25" in out
+
+
+def test_run_from_file_rejects_malformed_input(tmp_path):
+    # Ragged rows used to write one float past the row buffer (unchecked
+    # ublas operator[] under NDEBUG) before the dimension check fired, and
+    # a leading blank line silently corrupted dimension detection. All
+    # malformed lines are hard errors now, naming the offending line.
+    cases = [
+        ("ragged.txt",  "1.0 0.0\n0.0 1.0 2.0\n", r"line 2"),
+        ("blank.txt",   "1.0 0.0\n\n0.0 1.0\n",   r"line 2"),
+        ("garbage.txt", "1.0 abc\n",              r"line 1"),
+        ("empty.txt",   "",                       r"no data rows"),
+    ]
+    for name, content, pattern in cases:
+        src = tmp_path / name
+        src.write_text(content)
+        with pytest.raises(RuntimeError, match=pattern):
+            sketchsort.run_from_file(str(src), str(tmp_path / "out.txt"))
+
+
+def test_run_from_file_keeps_output_file_on_bad_input(tmp_path):
+    # The output file used to be opened (and truncated) before the input
+    # was read, so a typo'd input path destroyed an existing output file.
+    out = tmp_path / "out.txt"
+    out.write_text("precious\n")
+    with pytest.raises(RuntimeError):
+        sketchsort.run_from_file(str(tmp_path / "does_not_exist.txt"), str(out))
+    assert out.read_text() == "precious\n"

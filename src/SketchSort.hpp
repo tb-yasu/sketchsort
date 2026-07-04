@@ -93,7 +93,6 @@ struct params {
   unsigned int numchunks;
   unsigned int projectDim;
   unsigned int chunk_dist;
-  unsigned int chunks;
   unsigned int num_seq;
   unsigned int seq_len;
   unsigned int chunk_len;
@@ -116,13 +115,14 @@ struct params {
 };
 
 class SketchSort {
+  static constexpr unsigned int kProjectDim = 32;
+
   boost::pool<> *p;
   std::vector<boost::numeric::ublas::vector<float> > fvs;
   std::vector<float> norms;
   uint8_t num_char;
   unsigned int dim;
 
-  uint64_t numSort;
   uint64_t numHamDist;
   uint64_t numCosDist;
 
@@ -131,24 +131,30 @@ class SketchSort {
   void centeringData();
   void preComputeNorms(bool centered);
   void runCore(params &param);
-  int projectVectors(unsigned int projectDim, std::vector<uint8_t*> &sig, params &param);
+  void projectVectors(unsigned int projectDim, std::vector<uint8_t*> &sig, params &param);
   void report(std::vector<uint8_t*> &sig, int l, int r, params &param);
   void sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, params &param);
   void radixsort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, params &param);
   void insertionSort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, params &param);
   bool calc_chunk_hamdist(uint8_t *seq1, uint8_t *seq2, const params &param);
-  bool calc_hamdist(uint8_t *seq1, uint8_t *seq2, const params &param);
   bool check_canonical(uint8_t *seq1, uint8_t *seq2, const params &param);
   bool check_chunk_canonical(uint8_t *seq1, uint8_t *seq2, const params &param);
   float checkCos(unsigned int id1, unsigned int id2);
   double calcMissingEdgeRatio(params &param);
   void classify(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, int bpos, params &param);
   void multi_classification(std::vector<uint8_t*> &sig, int maxind, int l, int r, params &param);
-  void refinement();
-  void insertKnnList(unsigned int from_id, unsigned int to_id, float cosDist);
   void decideParameters(float _missingratio, params &param);
+  params initParams(unsigned int _numblocks,
+                     unsigned int _dist,
+                     float        _cosDist,
+                     unsigned int _numchunks,
+                     bool         _autoFlag,
+                     float        _missingratio,
+                     bool         _centering,
+                     unsigned int _seed,
+                     bool         _verbose);
  public:
-  SketchSort() {};
+  SketchSort() : p(nullptr), num_char(0), dim(0), numHamDist(0), numCosDist(0) {}
   void run(const char *fname, const char *oname,
 	   unsigned int _numblocks,
            unsigned int _dist,

@@ -139,6 +139,17 @@ def test_cpp_cli_hamdist_not_less_than_numblocks_exits_cleanly(tmp_path):
 
 
 @needs_cpp
+def test_cpp_cli_negative_hamdist_exits_cleanly(tmp_path):
+    out = tmp_path / "out.txt"
+    result = subprocess.run(
+        [CPP_BIN, "-hamdist", "-1", "-seed", "42", SAMPLE, str(out)],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1
+    assert result.stderr.strip() != ""
+
+
+@needs_cpp
 def test_cpp_cli_version_exits_zero():
     result = subprocess.run([CPP_BIN, "-version"], capture_output=True, text=True)
     assert result.returncode == 0
