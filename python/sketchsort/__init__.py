@@ -22,7 +22,7 @@ from ._core import search        as _search_core
 from ._core import run_from_file as _run_from_file_core
 
 __all__ = ["search", "run_from_file"]
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 
 # Internal defaults for the explicit-mode parameters. Only used to fill in

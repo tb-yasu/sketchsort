@@ -144,10 +144,10 @@ large (tens of millions of pairs are realistic). If memory is a concern,
 use `sketchsort.run_from_file(...)` instead — it streams pairs to disk
 while the algorithm runs.
 
-## Unreleased
+## 0.2.0 release notes
 
 Behavior changes from hardening the C++ core and CLI against invalid
-input (no version bump yet):
+input:
 
 - **Invalid input now raises instead of silently producing wrong output.**
   Zero-norm or non-finite (NaN/Inf) rows, out-of-range parameters
