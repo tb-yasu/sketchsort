@@ -201,23 +201,69 @@ algorithm runs.
 
 ## Advanced options
 
+Every parameter below is keyword-only. This is the full signature of each
+`search*` function; `run_from_file*` takes the same keywords plus
+`input_path`/`output_path` in place of `X`/`sets`:
+
+```python
+sketchsort.search(
+    X,
+    cos_dist=0.01,           # report pairs with cosine distance <= this
+    ham_dist=None,           # leave all three at None for auto mode (below),
+    num_blocks=None,         # or set all three together for manual mode
+    num_chunks=None,
+    missing_ratio=0.0001,    # auto mode only: upper bound on expected miss rate
+    centering=False,         # cosine-only: subtract per-dimension mean first
+    seed=0,                  # RNG seed; same seed + inputs -> same output
+    verbose=False,           # print progress to stdout/stderr
+)
+
+sketchsort.search_minmax(
+    X,
+    minmax_dist=0.1,
+    ham_dist=None, num_blocks=None, num_chunks=None,
+    missing_ratio=0.0001,
+    z_normalization=False,      # min-max-only: rescale each column to mean 0, var 1
+    minmax_normalization=False, # min-max-only: rescale each column to [0, 1]
+    seed=0,                     # -1 derives the seed from the clock instead
+    verbose=False,
+)
+
+sketchsort.search_jaccard(
+    sets,
+    jaccard_dist=0.05,
+    ham_dist=None, num_blocks=None, num_chunks=None,
+    missing_ratio=0.0001,
+    seed=5489,               # different default than the other two metrics;
+    verbose=False,           # still a fixed, reproducible value
+)
+```
+
+The sections below explain each option; every one shows a runnable call.
+
 ### `missing_ratio` and auto mode
 
-By default (`ham_dist`/`num_blocks`/`num_chunks` left at `None`),
-SketchSort picks its enumeration parameters automatically so that the
-expected fraction of missed true-neighbor pairs is at most `missing_ratio`.
-Smaller `missing_ratio` values search more exhaustively, at the cost of
-more time and memory. The bound is derived from the random-projection
-model and applies to the expectation, not to every individual run.
+Leaving `ham_dist`/`num_blocks`/`num_chunks` at `None` (the default) puts
+SketchSort in **auto mode**: it picks those three enumeration parameters
+automatically so that the expected fraction of missed true-neighbor pairs
+is at most `missing_ratio`. Smaller values search more exhaustively, at
+the cost of more time and memory. The bound is derived from the
+random-projection model and applies to the expectation, not to every
+individual run.
+
+```python
+# Miss at most ~0.01% of true neighbor pairs in expectation.
+pairs = sketchsort.search(X, cos_dist=0.01, missing_ratio=1e-4, seed=42)
+```
 
 ### Manual parameter control
 
 For full control of the sketch enumeration, pass all of `ham_dist`,
-`num_blocks`, and `num_chunks` to any `search*`/`run_from_file*` function.
-Providing any of these switches the call into manual mode, where
-`missing_ratio` is ignored. If you specify only some of the three, the
-rest fall back to defaults (`ham_dist=1`, `num_blocks=4`, `num_chunks=3`),
-so it is safer to set them together:
+`num_blocks`, and `num_chunks`. Providing any of these switches the call
+into **manual mode**, where `missing_ratio` is ignored. If you specify
+only some of the three, the rest silently fall back to defaults
+(`ham_dist=1`, `num_blocks=4`, `num_chunks=3`), so it is safer to set them
+together:
 
 ```python
 pairs = sketchsort.search(X, cos_dist=0.01, ham_dist=1, num_blocks=4, num_chunks=3, seed=42)
@@ -225,34 +271,60 @@ pairs = sketchsort.search(X, cos_dist=0.01, ham_dist=1, num_blocks=4, num_chunks
 
 ### Reproducibility (`seed`)
 
-`seed` (default `0` for cosine and Jaccard) seeds the random-number
-generator used to draw the projection vectors or hash permutations. For a
+`seed` selects the random-number generator state used to draw the
+projection vectors (cosine, min-max) or hash permutations (Jaccard). For a
 fixed build, two calls with the same `seed`, parameters, and input produce
-the same output. To reproduce the non-deterministic behaviour of upstream
-0.0.8, pass a time-based seed explicitly, e.g. `seed=int(time.time())`.
-Min-max also accepts `seed=-1` to derive the seed from the clock.
+the same output.
+
+```python
+a = sketchsort.search(X, cos_dist=0.01, seed=42)
+b = sketchsort.search(X, cos_dist=0.01, seed=42)
+assert (a == b).all()   # identical, same seed
+```
+
+To reproduce the non-deterministic behaviour of upstream 0.0.8, pass a
+time-based seed explicitly:
+
+```python
+import time
+pairs = sketchsort.search(X, cos_dist=0.01, seed=int(time.time()) % 2**32)
+```
+
+Min-max additionally treats a negative seed as "derive from the clock"
+(non-reproducible): `sketchsort.search_minmax(X, minmax_dist=0.1, seed=-1)`.
 
 ### Cosine: `centering`
 
-`centering` (default `False`) — when `True`, the coordinate-wise mean of
-`X` is subtracted from every row before both sketching and distance
-computation. The reported `cos_dist` is then the cosine distance between
-the *mean-shifted* vectors, not the raw input. Recommended when input
-vectors are non-negative and share a strong bias (e.g. raw bag-of-words
-counts, histograms, molecular fingerprints — the original SketchSort use
-case).
+When `centering=True`, the coordinate-wise mean of `X` is subtracted from
+every row before both sketching and distance computation, so the reported
+`cos_dist` is between the *mean-shifted* vectors, not the raw input.
+Recommended when input vectors are non-negative and share a strong bias
+(e.g. raw bag-of-words counts, histograms, molecular fingerprints — the
+original SketchSort use case).
+
+```python
+pairs = sketchsort.search(X, cos_dist=0.01, centering=True, seed=42)
+```
 
 ### Min-max: `z_normalization` / `minmax_normalization`
 
-Two optional, mutually-exclusive normalizers rescale each column of `X`
-before sketching: `z_normalization` (zero mean, unit variance) and
-`minmax_normalization` (rescale to `[0, 1]`).
+Two mutually-exclusive, optional normalizers rescale each column of `X`
+before sketching — pass at most one:
+
+```python
+pairs = sketchsort.search_minmax(X, minmax_dist=0.1, z_normalization=True, seed=42)
+pairs = sketchsort.search_minmax(X, minmax_dist=0.1, minmax_normalization=True, seed=42)
+```
 
 ### `verbose`
 
-`verbose` (default `False`) — when `True`, the underlying C++ core prints
-algorithm progress to stdout/stderr. Default is quiet; turn on for
-diagnostics.
+When `verbose=True`, the underlying C++ core prints algorithm progress
+(timing, chosen parameters, missing-edge ratio) to stdout/stderr. Default
+is quiet; turn on for diagnostics.
+
+```python
+sketchsort.search(X, cos_dist=0.01, seed=42, verbose=True)
+```
 
 ## Build from source
 
