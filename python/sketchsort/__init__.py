@@ -22,12 +22,16 @@ from ._core import search        as _search_core
 from ._core import run_from_file as _run_from_file_core
 from ._core import search_minmax        as _search_minmax_core
 from ._core import run_from_file_minmax as _run_from_file_minmax_core
+from ._core import search_jaccard        as _search_jaccard_core
+from ._core import run_from_file_jaccard as _run_from_file_jaccard_core
 
 __all__ = [
     "search",
     "run_from_file",
     "search_minmax",
     "run_from_file_minmax",
+    "search_jaccard",
+    "run_from_file_jaccard",
 ]
 __version__ = "0.3.0"
 
@@ -252,4 +256,90 @@ def run_from_file_minmax(
         minmax_normalization = minmax_normalization,
         seed                 = seed,
         verbose              = verbose,
+    )
+
+
+def search_jaccard(
+    sets,
+    *,
+    jaccard_dist: float = 0.05,
+    ham_dist: Optional[int] = None,
+    num_blocks: Optional[int] = None,
+    num_chunks: Optional[int] = None,
+    missing_ratio: float = 0.0001,
+    seed: int = 5489,
+    verbose: bool = False,
+):
+    """Find all set pairs whose Jaccard/Tanimoto distance is at most `jaccard_dist`.
+
+    The Jaccard similarity of two integer-id sets is ``|A & B| / |A | B|`` and the
+    reported distance is ``1 - similarity``. Sketches are MinHash values.
+
+    Auto vs manual selection follows the same rule as `search()`: leave
+    `ham_dist` / `num_blocks` / `num_chunks` at `None` for auto mode.
+
+    Parameters
+    ----------
+    sets : sequence of sequence of int
+        ``sets[i]`` is the set of non-negative integer ids for row i. Duplicate
+        ids are removed. Empty sets are kept so that row i always has id i.
+    jaccard_dist : float
+        Maximum Jaccard distance for a pair to be reported. Default 0.05.
+    ham_dist, num_blocks, num_chunks : int, optional
+        Power-user override of the multiple-sort enumeration parameters.
+    missing_ratio : float
+        Target probability of missing a true neighbour (auto mode only).
+    seed : int
+        Random seed for the MinHash permutations. Default 5489 = deterministic.
+    verbose : bool
+        Print algorithm progress to stdout. Default False (quiet).
+
+    Returns
+    -------
+    ndarray with dtype [('id1', '<u4'), ('id2', '<u4'), ('jaccard_dist', '<f4')]
+    """
+    _validate_seed(seed)
+    auto = _resolve_auto(ham_dist, num_blocks, num_chunks)
+    return _search_jaccard_core(
+        [list(s) for s in sets],
+        jaccard_dist  = jaccard_dist,
+        ham_dist      = _MANUAL_HAM_DIST   if ham_dist   is None else ham_dist,
+        num_blocks    = _MANUAL_NUM_BLOCKS if num_blocks is None else num_blocks,
+        num_chunks    = _MANUAL_NUM_CHUNKS if num_chunks is None else num_chunks,
+        auto_mode     = auto,
+        missing_ratio = missing_ratio,
+        seed          = seed,
+        verbose       = verbose,
+    )
+
+
+def run_from_file_jaccard(
+    input_path: str,
+    output_path: str,
+    *,
+    jaccard_dist: float = 0.05,
+    ham_dist: Optional[int] = None,
+    num_blocks: Optional[int] = None,
+    num_chunks: Optional[int] = None,
+    missing_ratio: float = 0.0001,
+    seed: int = 5489,
+    verbose: bool = False,
+):
+    """Read whitespace-separated integer-id sets (one per line) from
+    `input_path`, write 'id1 id2 jaccard_dist' triples to `output_path`.
+    Auto / manual selection follows the same rule as `search_jaccard()`.
+    """
+    _validate_seed(seed)
+    auto = _resolve_auto(ham_dist, num_blocks, num_chunks)
+    _run_from_file_jaccard_core(
+        input_path    = input_path,
+        output_path   = output_path,
+        jaccard_dist  = jaccard_dist,
+        ham_dist      = _MANUAL_HAM_DIST   if ham_dist   is None else ham_dist,
+        num_blocks    = _MANUAL_NUM_BLOCKS if num_blocks is None else num_blocks,
+        num_chunks    = _MANUAL_NUM_CHUNKS if num_chunks is None else num_chunks,
+        auto_mode     = auto,
+        missing_ratio = missing_ratio,
+        seed          = seed,
+        verbose       = verbose,
     )

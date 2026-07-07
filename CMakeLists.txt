@@ -19,6 +19,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_library(sketchsort_core STATIC
     src/sketch_sort.cpp
     src/sketch_sort_minmax.cpp
+    src/sketch_sort_jaccard.cpp
 )
 
 target_include_directories(sketchsort_core

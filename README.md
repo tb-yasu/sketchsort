@@ -1,18 +1,22 @@
 # sketchsort
 
-Fast all-pairs cosine-similarity search via random projection sketches.
+Fast all-pairs similarity search via random projection sketches.
 
-`sketchsort` finds pairs of high-dimensional float vectors whose cosine
-distance is below a given threshold. Here, the cosine distance is defined
-as `1 - cosine_similarity`, where
-`cosine_similarity = ⟨x, y⟩ / (‖x‖ · ‖y‖)`. Input vectors do not need to
-be pre-normalized; norms are computed internally. 
+`sketchsort` finds all pairs of high-dimensional data whose distance is
+below a given threshold, under three similarity measures:
 
-The algorithm sketches vectors into binary sequences by random
-projection, then enumerates near-duplicate sketches using the
-multiple-sorting technique of Tabei et al. (2010). The missing-edge-ratio
-parameter (`missing_ratio`) controls how exhaustive this enumeration is.
-See the Python API section below for details.
+| Metric | Input | Function | Distance |
+| --- | --- | --- | --- |
+| **Cosine** | dense float vectors | `search` | `1 - ⟨x,y⟩/(‖x‖·‖y‖)` |
+| **Min-max** (generalized Jaccard / Tanimoto on real vectors) | dense float vectors | `search_minmax` | `1 - Σ min(xᵢ,yᵢ)/Σ max(xᵢ,yᵢ)` |
+| **Jaccard / Tanimoto** | sparse integer-id sets | `search_jaccard` | `1 - |A∩B|/|A∪B|` |
+
+Each metric sketches its input into a short byte string — sign of a random
+projection (cosine), generalized consistent weighted sampling (min-max),
+or MinHash (Jaccard) — then enumerates near-duplicate sketches using the
+shared multiple-sorting technique of Tabei et al. (2010). The
+missing-edge-ratio parameter (`missing_ratio`) controls how exhaustive
+this enumeration is. See the Python API section below for details.
 
 ## Install
 
@@ -115,6 +119,56 @@ lines, non-numeric tokens, lines with too many values, and a completely
 empty file are all rejected with an error naming the offending line
 rather than being silently skipped or truncated.
 
+## Other similarity metrics
+
+Besides cosine, the package exposes two more metrics with the same
+auto/manual parameter model and the same reproducible-by-`seed` behaviour.
+Each returns a NumPy structured array and has a matching `run_from_file_*`
+for streaming file pipelines.
+
+### Min-max (generalized Jaccard on real vectors)
+
+`search_minmax(X, ...)` takes the same dense `(N, D)` float matrix as
+`search`, and reports pairs whose min-max distance is at most
+`minmax_dist`. Sketches come from generalized consistent weighted sampling
+(Li, 2017). Negative values are allowed. Two optional normalizers,
+`z_normalization` and `minmax_normalization`, rescale each column before
+sketching.
+
+```python
+import numpy as np, sketchsort
+X = np.loadtxt("dat/sample_minmax.txt", dtype=np.float32)
+pairs = sketchsort.search_minmax(X, minmax_dist=0.2, missing_ratio=1e-4, seed=42)
+# dtype: [('id1','<u4'), ('id2','<u4'), ('minmax_dist','<f4')]
+```
+
+### Jaccard / Tanimoto (sparse integer-id sets)
+
+`search_jaccard(sets, ...)` takes a sequence of integer-id sets — `sets[i]`
+is the collection of non-negative ids present in row `i` (e.g. the "on"
+bits of a molecular fingerprint) — and reports pairs whose Jaccard
+distance is at most `jaccard_dist`. Sketches are MinHash values. Duplicate
+ids within a set are removed; empty sets are kept so row `i` always has
+id `i`.
+
+```python
+import sketchsort
+sets = [[0, 3, 7], [0, 3, 7, 9], [1, 2], [7, 9]]
+pairs = sketchsort.search_jaccard(sets, jaccard_dist=0.5, missing_ratio=1e-4, seed=42)
+# dtype: [('id1','<u4'), ('id2','<u4'), ('jaccard_dist','<f4')]
+```
+
+The Jaccard pipeline is fully integer/byte deterministic (MinHash with a
+hand-rolled mt19937 Fisher-Yates shuffle plus exact intersection/union),
+so for a fixed `seed` its output is identical across platforms. The cosine
+and min-max cores are deterministic per platform but their final
+distance/threshold comparison can flip a few boundary pairs across
+platforms due to libm differences.
+
+`run_from_file_minmax(in, out, ...)` reads dense float vectors (like the
+cosine file format); `run_from_file_jaccard(in, out, ...)` reads one
+whitespace-separated integer-id set per line.
+
 ## Command line
 
 Installing the package also installs a `sketchsort` console script. It
@@ -143,6 +197,22 @@ returning. For large inputs at loose thresholds the result can be very
 large (tens of millions of pairs are realistic). If memory is a concern,
 use `sketchsort.run_from_file(...)` instead — it streams pairs to disk
 while the algorithm runs.
+
+## 0.3.0 release notes
+
+- **Two new similarity metrics** alongside cosine, sharing the same
+  multiple-sort enumeration engine but living in separate C++ sub-namespaces
+  (`sketchsort::minmax`, `sketchsort::jaccard`):
+  - `search_minmax` / `run_from_file_minmax` — min-max (generalized Jaccard /
+    Tanimoto) on dense real vectors via generalized consistent weighted
+    sampling, with optional `z_normalization` / `minmax_normalization`.
+  - `search_jaccard` / `run_from_file_jaccard` — Jaccard / Tanimoto on sparse
+    integer-id sets via MinHash.
+- Both new cores were built with the same in-memory + file APIs, exception
+  (not `exit()`) error handling, and deterministic-by-`seed` behaviour as the
+  cosine core. The Jaccard MinHash uses a hand-rolled mt19937 Fisher-Yates
+  shuffle so it is reproducible across platforms.
+- No change to the existing cosine `search` / `run_from_file` API or output.
 
 ## 0.2.0 release notes
 
@@ -302,6 +372,15 @@ for Large Databases of Molecular Fingerprints*. Molecular Informatics
 
 ## License
 
-MIT for the SketchSort source (see `LICENSE`). The bundled Boost headers
-under `src/boost/` are distributed under the Boost Software License 1.0
-(see `NOTICE`).
+The cosine core (`src/sketch_sort.*`, `src/main.cpp`) and the Python
+packaging are MIT-licensed (see `LICENSE`). The min-max and Jaccard cores
+(`src/sketch_sort_minmax.*`, `src/sketch_sort_jaccard.*`) are BSD-3-Clause,
+as noted in their per-file SPDX headers. The bundled Boost headers under
+`src/boost/` are distributed under the Boost Software License 1.0 (see
+`NOTICE`).
+
+The min-max method additionally builds on:
+
+Li, P. (2017). *Linearized GMM Kernels and Normalized Random Fourier
+Features*. In Proceedings of the 23rd ACM SIGKDD International Conference on
+Knowledge Discovery and Data Mining (KDD), 315–324.

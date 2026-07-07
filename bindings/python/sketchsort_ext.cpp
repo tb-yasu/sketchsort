@@ -3,6 +3,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 #include <cstring>
 #include <cstdint>
@@ -15,6 +16,7 @@
 
 #include "sketch_sort.hpp"
 #include "sketch_sort_minmax.hpp"
+#include "sketch_sort_jaccard.hpp"
 
 namespace py = pybind11;
 
@@ -133,11 +135,60 @@ static void run_from_file_minmax_py(
            seed, verbose);
 }
 
+static py::array search_jaccard_py(
+    const std::vector<std::vector<std::uint32_t>> &sets,
+    float jaccard_dist,
+    unsigned int ham_dist,
+    unsigned int num_blocks,
+    unsigned int num_chunks,
+    bool auto_mode,
+    float missing_ratio,
+    unsigned int seed,
+    bool verbose)
+{
+    std::vector<sketchsort::jaccard::Pair> pairs;
+    {
+        sketchsort::jaccard::SketchSort ss;
+        py::gil_scoped_release release;
+        ss.search(sets,
+                  num_blocks, ham_dist, jaccard_dist, num_chunks,
+                  auto_mode, missing_ratio, seed, verbose,
+                  pairs);
+    }
+
+    py::array_t<sketchsort::jaccard::Pair> out(static_cast<py::ssize_t>(pairs.size()));
+    if (!pairs.empty()) {
+        std::memcpy(out.mutable_data(), pairs.data(),
+                    pairs.size() * sizeof(sketchsort::jaccard::Pair));
+    }
+    return std::move(out);
+}
+
+static void run_from_file_jaccard_py(
+    const std::string &input_path,
+    const std::string &output_path,
+    float jaccard_dist,
+    unsigned int ham_dist,
+    unsigned int num_blocks,
+    unsigned int num_chunks,
+    bool auto_mode,
+    float missing_ratio,
+    unsigned int seed,
+    bool verbose)
+{
+    sketchsort::jaccard::SketchSort ss;
+    py::gil_scoped_release release;
+    ss.run(input_path.c_str(), output_path.c_str(),
+           num_blocks, ham_dist, jaccard_dist, num_chunks,
+           auto_mode, missing_ratio, seed, verbose);
+}
+
 PYBIND11_MODULE(_core, m) {
-    m.doc() = "SketchSort: fast all-pairs similarity search via random projection sketches (cosine and min-max metrics).";
+    m.doc() = "SketchSort: fast all-pairs similarity search via random projection sketches (cosine, min-max, and Jaccard metrics).";
 
     PYBIND11_NUMPY_DTYPE(sketchsort::Pair, id1, id2, cos_dist);
     PYBIND11_NUMPY_DTYPE(sketchsort::minmax::Pair, id1, id2, minmax_dist);
+    PYBIND11_NUMPY_DTYPE(sketchsort::jaccard::Pair, id1, id2, jaccard_dist);
 
     m.def("search", &search_py,
           py::arg("X"),
@@ -250,4 +301,56 @@ ndarray with dtype [('id1', '<u4'), ('id2', '<u4'), ('minmax_dist', '<f4')]
           py::arg("seed")                 = 0,
           py::arg("verbose")              = false,
           "Read whitespace-separated float vectors from input_path, write 'id1 id2 minmax_dist' triples to output_path. Matches the standalone min-max CLI output format.");
+
+    m.def("search_jaccard", &search_jaccard_py,
+          py::arg("sets"),
+          py::arg("jaccard_dist")  = 0.05f,
+          py::arg("ham_dist")      = 1u,
+          py::arg("num_blocks")    = 4u,
+          py::arg("num_chunks")    = 3u,
+          py::arg("auto_mode")     = false,
+          py::arg("missing_ratio") = 0.0001f,
+          py::arg("seed")          = 5489u,
+          py::arg("verbose")       = false,
+          R"doc(Find all set pairs whose Jaccard/Tanimoto distance is at most jaccard_dist.
+
+Each input set is a collection of non-negative integer ids; the Jaccard
+similarity of two sets is |A & B| / |A | B| and the reported distance is
+1 - similarity. Sketches are MinHash values.
+
+Parameters
+----------
+sets : sequence of sequence of int
+    sets[i] is the integer-id set for row i (duplicates are removed). Empty
+    sets are kept so that row i always has id i.
+jaccard_dist : float
+    Maximum Jaccard distance for a pair to be reported. Default 0.05.
+ham_dist, num_blocks, num_chunks : int
+    Multiple-sort enumeration parameters (used when auto_mode is False).
+auto_mode : bool
+    If True, ham_dist / num_blocks / num_chunks are derived from missing_ratio.
+missing_ratio : float
+    Target probability of missing a true neighbor (used when auto_mode is True).
+seed : int
+    Random seed for the MinHash permutations (deterministic; default 5489).
+verbose : bool
+    If True, print algorithm progress to stdout/stderr (default False).
+
+Returns
+-------
+ndarray with dtype [('id1', '<u4'), ('id2', '<u4'), ('jaccard_dist', '<f4')]
+)doc");
+
+    m.def("run_from_file_jaccard", &run_from_file_jaccard_py,
+          py::arg("input_path"),
+          py::arg("output_path"),
+          py::arg("jaccard_dist")  = 0.05f,
+          py::arg("ham_dist")      = 1u,
+          py::arg("num_blocks")    = 4u,
+          py::arg("num_chunks")    = 3u,
+          py::arg("auto_mode")     = false,
+          py::arg("missing_ratio") = 0.0001f,
+          py::arg("seed")          = 5489u,
+          py::arg("verbose")       = false,
+          "Read whitespace-separated integer-id sets (one per line) from input_path, write 'id1 id2 jaccard_dist' triples to output_path. Matches the standalone Jaccard CLI output format.");
 }

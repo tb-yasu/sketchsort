@@ -69,4 +69,6 @@ sdist.exclude = [
   "src/sketchsort",
   "CLAUDE.md",
   ".DS_Store",
+  "/tmp",
+  "tmp/",
 ]

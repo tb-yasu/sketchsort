@@ -35,3 +35,6 @@ src/Main_flymake.cpp
 
 # Internal docs not for distribution
 CLAUDE.md
+
+# Local scratch (venvs, ad-hoc scripts)
+tmp/
