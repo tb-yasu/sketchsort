@@ -214,6 +214,18 @@ while the algorithm runs.
   shuffle so it is reproducible across platforms.
 - No change to the existing cosine `search` / `run_from_file` API or output.
 
+Internal (no behavior change — output is byte-identical):
+
+- The multiple-sort enumeration machinery (radix/insertion sorting, block
+  grouping, canonicality checks, candidate-pair reporting, missing-edge-ratio
+  math, parameter auto-selection and validation) previously existed as three
+  near-identical copies, one per metric. It now lives once in
+  `src/multi_sort_engine.hpp` (`sketchsort::engine::MultiSortEngine`), with
+  each metric supplying only its projection, exact-distance verification, and
+  an optional O(1) prefilter through an inlined template hook. Verified
+  byte-identical output across all three metrics on nine seed/parameter
+  configurations, including the `-ffast-math` legacy Makefile build.
+
 ## 0.2.0 release notes
 
 Behavior changes from hardening the C++ core and CLI against invalid

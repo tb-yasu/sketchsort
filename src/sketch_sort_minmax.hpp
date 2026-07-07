@@ -7,9 +7,8 @@
  *
  * Min-max (generalized Jaccard / Tanimoto on real vectors) all-pairs
  * similarity search. Sketches are produced by generalized consistent
- * weighted sampling (Ping Li, KDD'17). Enumeration reuses the same
- * multiple-sort machinery as the cosine and jaccard variants but lives in
- * its own sub-namespace so the three cores can coexist in one library.
+ * weighted sampling (Ping Li, KDD'17); the enumeration itself runs on the
+ * shared engine in multi_sort_engine.hpp.
  */
 
 #ifndef SKETCH_SORT_MINMAX_HPP
@@ -43,11 +42,6 @@
 namespace sketchsort {
 namespace minmax {
 
-struct PosRange {
-  int start;
-  int end;
-};
-
 struct Pair {
   std::uint32_t id1;
   std::uint32_t id2;
@@ -58,25 +52,14 @@ static_assert(offsetof(Pair, id1)         == 0,  "unexpected layout");
 static_assert(offsetof(Pair, id2)         == 4,  "unexpected layout");
 static_assert(offsetof(Pair, minmax_dist) == 8,  "unexpected layout");
 
+// Metric-level parameters only; the multiple-sort enumeration state lives in
+// engine::MultiSortEngine (multi_sort_engine.hpp).
 struct Params {
   std::uint32_t num_blocks;
   std::uint32_t num_chunks;
-  std::uint32_t project_dim;
   std::uint32_t chunk_dist;
-  std::uint32_t num_seq;
-  std::uint32_t seq_len;
-  std::uint32_t chunk_len;
-  std::uint32_t start_chunk;
-  std::uint32_t current_chunk;
-  unsigned long seed;
-  std::uint32_t *counter;
-  PosRange     *pos;
-  PosRange     *pchunks;
   float         minmax_dist;
-  std::vector<std::uint32_t> ids;
-  std::vector<int> blocks;
-  std::vector<uint8_t*> new_sig;
-  std::vector<std::uint32_t> new_ids;
+  unsigned long seed;
   std::ostream *os     = nullptr;
   std::vector<Pair> *pairs = nullptr;
   bool          auto_mode            = false;
@@ -90,7 +73,7 @@ class SketchSort {
   static constexpr std::uint32_t kProjectDim = 32;
 
  public:
-  SketchSort() : sig_pool_(nullptr), dim_(0), num_char_(0) {}
+  SketchSort() : sig_pool_(nullptr), dim_(0) {}
 
   // File in, file out. Matches the standalone CLI's behaviour and output.
   void run(const char *input_path, const char *output_path,
@@ -134,18 +117,10 @@ class SketchSort {
                      long          seed,
                      bool          verbose);
   void run_core(Params &param);
-  void project_vectors(std::uint32_t project_dim, std::vector<uint8_t*> &sig, Params &param);
-  void report(std::vector<uint8_t*> &sig, int l, int r, Params &param);
-  void radix_sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, Params &param);
-  void insertion_sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, Params &param);
-  bool calc_chunk_hamdist(uint8_t *seq1, uint8_t *seq2, const Params &param);
-  bool check_canonical(uint8_t *seq1, uint8_t *seq2, const Params &param);
-  bool check_chunk_canonical(uint8_t *seq1, uint8_t *seq2, const Params &param);
+  void project_vectors(std::uint32_t project_dim, std::vector<uint8_t*> &sig,
+                       unsigned long seed, bool verbose);
   float calc_minmax_dist(std::uint32_t id1, std::uint32_t id2);
-  double calc_missing_edge_ratio(Params &param);
-  void classify(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, int bpos, Params &param);
-  void tune_parameters(float missing_ratio, Params &param);
-  void multi_classification(std::vector<uint8_t*> &sig, int maxind, int l, int r, Params &param);
+  static double mismatch_prob(float minmax_dist);
 
   float safe_log(float val);
   void generate_matrix(std::uint32_t project_dim, unsigned long seed,
@@ -158,7 +133,6 @@ class SketchSort {
   uint8_t           *sig_pool_;
   std::vector<std::vector<float> > fvs_;
   std::uint64_t      dim_;
-  std::uint32_t      num_char_;
 };
 
 }  // namespace minmax

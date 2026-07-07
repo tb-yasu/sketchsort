@@ -73,11 +73,6 @@ namespace sketchsort {
 using namespace boost::numeric::ublas;  // boost::numeric::ublas
 using namespace boost::numeric;         // boost::numeric
 
-struct PosRange {
-  int start;
-  int end;
-};
-
 struct Pair {
   std::uint32_t id1;
   std::uint32_t id2;
@@ -88,23 +83,13 @@ static_assert(offsetof(Pair, id1)      == 0,  "unexpected layout");
 static_assert(offsetof(Pair, id2)      == 4,  "unexpected layout");
 static_assert(offsetof(Pair, cos_dist) == 8,  "unexpected layout");
 
+// Metric-level parameters only; the multiple-sort enumeration state lives in
+// engine::MultiSortEngine (multi_sort_engine.hpp).
 struct Params {
   unsigned int num_blocks;
   unsigned int num_chunks;
-  unsigned int project_dim;
   unsigned int ham_dist;
-  unsigned int num_sketches;
-  unsigned int sketch_len;
-  unsigned int chunk_len;
-  unsigned int chunk_start;
-  unsigned int chunk_end;
-  unsigned int current_chunk;
-  unsigned int *radix_counts;
-  PosRange     *block_ranges;
-  PosRange     *chunk_ranges;
-  float         cos_dist;
-  std::vector<unsigned int> row_ids;
-  std::vector<int> selected_blocks;
+  float        cos_dist;
   std::ostream *out_stream = nullptr;
   std::vector<Pair> *pairs = nullptr;
   bool         auto_mode     = false;
@@ -120,30 +105,16 @@ class SketchSort {
   boost::pool<> *sketch_pool_;
   std::vector<boost::numeric::ublas::vector<float> > feature_vectors_;
   std::vector<float> inv_norms_;
-  uint8_t alphabet_size_;
   unsigned int dim_;
-
-  uint64_t num_ham_dist_;
-  uint64_t num_cos_dist_;
 
   void read_features(const char *input_path);
   void set_features_from_raw(const float *data, std::size_t n_rows, std::size_t n_cols);
   void center_data();
   void precompute_norms(bool centered);
   void run_core(Params &param);
-  void project_vectors(unsigned int project_dim, std::vector<uint8_t*> &sketches, Params &param);
-  void report(std::vector<uint8_t*> &sketches, int left, int right, Params &param);
-  void sort(std::vector<uint8_t*> &sketches, int start_pos, int end_pos, int left, int right, Params &param);
-  void radix_sort(std::vector<uint8_t*> &sketches, int start_pos, int end_pos, int left, int right, Params &param);
-  void insertion_sort(std::vector<uint8_t*> &sketches, int start_pos, int end_pos, int left, int right, Params &param);
-  bool check_chunk_ham_dist(uint8_t *sketch1, uint8_t *sketch2, const Params &param);
-  bool check_canonical(uint8_t *sketch1, uint8_t *sketch2, const Params &param);
-  bool check_chunk_canonical(uint8_t *sketch1, uint8_t *sketch2, const Params &param);
+  void project_vectors(unsigned int project_dim, std::vector<uint8_t*> &sketches, unsigned int seed);
   float calc_cos_dist(unsigned int id1, unsigned int id2);
-  double calc_missing_edge_ratio(Params &param);
-  void classify(std::vector<uint8_t*> &sketches, int start_pos, int end_pos, int left, int right, int block_idx, Params &param);
-  void multi_classification(std::vector<uint8_t*> &sketches, int start_block, int left, int right, Params &param);
-  void decide_parameters(float missing_ratio, Params &param);
+  static double mismatch_prob(float cos_dist);
   Params init_params(unsigned int num_blocks,
                       unsigned int ham_dist,
                       float        cos_dist,
@@ -154,7 +125,7 @@ class SketchSort {
                       unsigned int seed,
                       bool         verbose);
  public:
-  SketchSort() : sketch_pool_(nullptr), alphabet_size_(0), dim_(0), num_ham_dist_(0), num_cos_dist_(0) {}
+  SketchSort() : sketch_pool_(nullptr), dim_(0) {}
   void run(const char *input_path, const char *output_path,
 	   unsigned int num_blocks,
            unsigned int ham_dist,

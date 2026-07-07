@@ -8,6 +8,8 @@
 
 #include "sketch_sort_minmax.hpp"
 
+#include "multi_sort_engine.hpp"
+
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -109,11 +111,12 @@ void SketchSort::generate_matrix(std::uint32_t project_dim, unsigned long seed,
   }
 }
 
-void SketchSort::project_vectors(std::uint32_t project_dim, std::vector<uint8_t*> &sig, Params &param) {
+void SketchSort::project_vectors(std::uint32_t project_dim, std::vector<uint8_t*> &sig,
+                                 unsigned long seed, bool verbose) {
   std::vector<std::vector<float> > mat_r;
   std::vector<std::vector<float> > mat_c;
   std::vector<std::vector<float> > mat_b;
-  generate_matrix(project_dim, param.seed, mat_r, mat_c, mat_b);
+  generate_matrix(project_dim, seed, mat_r, mat_c, mat_b);
 
   std::uint64_t dat_dim2 = dim_ << 1;
 
@@ -133,10 +136,8 @@ void SketchSort::project_vectors(std::uint32_t project_dim, std::vector<uint8_t*
   std::size_t row_len = (std::size_t)project_dim + 1;
   sig_pool_ = new uint8_t[fvs_.size() * row_len];
   sig.resize(fvs_.size());
-  param.ids.resize(fvs_.size());
   for (std::size_t i = 0; i < sig.size(); i++) {
-    sig[i]       = sig_pool_ + i * row_len;
-    param.ids[i] = i;
+    sig[i] = sig_pool_ + i * row_len;
   }
 
   // Reused per data point: the nonzero elements of the expanded 2*dim_ vector.
@@ -148,7 +149,7 @@ void SketchSort::project_vectors(std::uint32_t project_dim, std::vector<uint8_t*
   nz_log.reserve(dat_dim2);
 
   for (std::size_t i = 0; i < fvs_.size(); ++i) {
-    if (param.verbose && i % 1000 == 0)
+    if (verbose && i % 1000 == 0)
       std::cerr << "project " << i << " < " << fvs_.size() << std::endl;
 
     std::vector<float> &fv = fvs_[i];
@@ -184,9 +185,6 @@ void SketchSort::project_vectors(std::uint32_t project_dim, std::vector<uint8_t*
       sig[i][j+1] = min_index % 256;
     }
   }
-
-  param.seq_len = project_dim;
-  param.num_seq = fvs_.size();
 }
 
 inline float SketchSort::calc_minmax_dist(std::uint32_t id1, std::uint32_t id2) {
@@ -215,197 +213,10 @@ inline float SketchSort::calc_minmax_dist(std::uint32_t id1, std::uint32_t id2) 
   return (1.f - num/den);
 }
 
-inline void SketchSort::radix_sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, Params &param) {
-  std::uint32_t *c      = param.counter;
-  std::vector<std::uint32_t> &ids      = param.ids;
-  std::vector<uint8_t*> &new_sig = param.new_sig;
-  std::vector<std::uint32_t> &new_ids = param.new_ids;
-  std::uint32_t tmp;
-  int tpos = spos - 1;
-  while (++tpos <= epos) {
-    for (std::uint32_t i = 0; i < num_char_; i++) *(c + i) = 0;
-    for (int i = l; i <= r; i++) c[sig[i][tpos]]++;
-    for (std::uint32_t i = 1; i < num_char_; i++) *(c + i) += *(c + i - 1);
-    for (int i = r; i >= l; --i) {
-      tmp = --c[sig[i][tpos]] + l;
-      new_ids[tmp - l] = ids[i];
-      new_sig[tmp - l] = sig[i];
-    }
-    if (++tpos <= epos) {
-      for (std::uint32_t i = 0; i < num_char_; i++) *(c + i) = 0;
-      for (int i = l; i <= r; i++) c[new_sig[i - l][tpos]]++;
-      for (std::uint32_t i = 1; i < num_char_; i++) *(c + i) += *(c + i - 1);
-      for (int i = r; i >= l; --i) {
-	tmp = --c[new_sig[i - l][tpos]] + l;
-	ids[tmp] = new_ids[i - l];
-	sig[tmp] = new_sig[i - l];
-      }
-    }
-    else {
-      for (int i = l; i <= r; i++) {
-	ids[i] = new_ids[i - l];
-	sig[i] = new_sig[i - l];
-      }
-      return;
-    }
-  }
-}
-
-inline void SketchSort::insertion_sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, Params &param) {
-  int i, j;
-  uint8_t *pivot, pval;
-  std::uint32_t pid;
-  std::vector<std::uint32_t> &ids = param.ids;
-  for (int tpos = spos; tpos <= epos; tpos++) {
-    for (i = l + 1; i <= r; i++) {
-      pivot = sig[i]; pval = sig[i][tpos]; pid = ids[i];
-      for (j = i; j > l && sig[j-1][tpos] > pval; j--) {
-	sig[j] = sig[j-1];
-	ids[j] = ids[j-1];
-      }
-      sig[j] = pivot;
-      ids[j] = pid;
-    }
-  }
-}
-
-inline void SketchSort::classify(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, int bpos, Params &param) {
-  int n_l = l, n_r = r;
-  for (int iter = l + 1; iter <= r; iter++) {
-    if (!std::equal(sig[n_l] + spos, sig[n_l] + epos + 1, sig[iter] + spos)) {
-      n_r = iter - 1;
-      if (n_r - n_l >= 1)
-	multi_classification(sig, bpos + 1, n_l, n_r, param);
-      n_l = iter;
-    }
-  }
-  if (r - n_l >= 1)
-    multi_classification(sig, bpos + 1, n_l, r, param);
-}
-
-inline bool SketchSort::calc_chunk_hamdist(uint8_t *seq1, uint8_t *seq2, const Params &param) {
-  std::uint32_t d = 0;
-  for (std::size_t i = 1;  i <= param.chunk_len; i++)
-    if (*seq1++ != *seq2++ && ++d > param.chunk_dist) return false;
-  return true;
-}
-
-inline bool SketchSort::check_chunk_canonical(uint8_t *seq1, uint8_t *seq2, const Params &param) {
-  std::uint32_t d = 0;
-  int end        = param.pchunks[param.current_chunk].start - 1;
-  int j          = 1;
-  int tend       = param.pchunks[j].end;
-  int i          = 0;
-
-  while (++i <= end) {
-    if (seq1[i] != seq2[i] && ++d > param.chunk_dist) {
-      // This earlier chunk exceeds the threshold, so it cannot cause a
-      // duplicate report; skip to the start of the next chunk.
-      d = 0;
-      tend = param.pchunks[++j].end;
-      i    = param.pchunks[j].start - 1;
-      continue;
-    }
-    if (tend == i)
-      return false;
-  }
-  return true;
-}
-
-inline bool SketchSort::check_canonical(uint8_t *seq1, uint8_t *seq2, const Params &param) {
-  std::size_t sb = 1, eb = 1;
-  std::size_t b;
-  for (std::size_t i = 0, size = param.blocks.size(); i < size; i++) {
-    eb = param.blocks[i];
-    for (b = sb; b < eb; b++) {
-      if (std::equal(seq1 + param.pos[b].start, seq1 + param.pos[b].end + 1, seq2 + param.pos[b].start))
-	  return false;
-    }
-    sb = param.blocks[i] + 1;
-  }
-  return true;
-}
-
-inline void SketchSort::report(std::vector<uint8_t*> &sig, int l, int r, Params &param) {
-  float dist;
-  for (int i = l; i < r; i++) {
-    for (int j = i + 1; j <= r; j++) {
-      if (calc_chunk_hamdist(sig[i] + param.start_chunk, sig[j] + param.start_chunk, param) &&
-	  check_canonical(sig[i], sig[j], param) &&
-	  check_chunk_canonical(sig[i], sig[j], param) &&
-	  ((dist = calc_minmax_dist(param.ids[i], param.ids[j])) <= param.minmax_dist)) {
-	if (param.pairs) {
-	  Pair pr;
-	  pr.id1         = static_cast<std::uint32_t>(param.ids[i]);
-	  pr.id2         = static_cast<std::uint32_t>(param.ids[j]);
-	  pr.minmax_dist = dist;
-	  param.pairs->push_back(pr);
-	}
-	if (param.os) {
-	  (*param.os) << param.ids[i] << " " << param.ids[j] << " " << dist << "\n";
-	}
-      }
-    }
-  }
-}
-
-void SketchSort::multi_classification(std::vector<uint8_t*> &sig, int maxind, int l, int r, Params &param) {
-  if (param.blocks.size() == param.num_blocks - param.chunk_dist) {
-    report(sig, l, r, param);
-    return;
-  }
-
-  for (int bpos = maxind; bpos <= (int)param.num_blocks; bpos++) {
-    if (param.blocks.size() + (param.num_blocks - bpos + 1) < param.num_blocks - param.chunk_dist) { // pruning
-      return;
-    }
-    param.blocks.push_back(bpos);
-    // Small ranges are cheaper to insertion-sort than to radix-sort (which
-    // clears a 256-entry histogram on every pass).
-    if (r - l < 20)
-      insertion_sort(sig, param.pos[bpos].start, param.pos[bpos].end, l, r, param);
-    else
-      radix_sort(sig, param.pos[bpos].start, param.pos[bpos].end, l, r, param);
-    classify(sig, param.pos[bpos].start, param.pos[bpos].end, l, r, bpos, param);
-    param.blocks.pop_back();
-  }
-}
-
-static double combination(int n, int m) {
-  double sum = 1.0;
-  for (int i = 0; i < m; i++) {
-    sum *= (double)(n - i) / (double)(m - i);
-  }
-  return sum;
-}
-
-double SketchSort::calc_missing_edge_ratio(Params &param) {
-  double sum = 0.f;
-  double prob = (255.0/256.0)*param.minmax_dist;
-  std::uint32_t l = param.project_dim;
-  std::uint32_t d = param.chunk_dist;
-  for (std::uint32_t k = 0; k <= d; k++) {
-    sum += (combination(l, k) * pow(prob, k) * pow(1.f - prob, l - k));
-  }
-  return pow(1.f - sum, param.num_chunks);
-}
-
-void SketchSort::tune_parameters(float missing_ratio, Params &param) {
-  std::uint32_t ham_dist   = 1;
-  std::uint32_t num_blocks = ham_dist + 3;
-  std::uint32_t num_chunks = 0;
-
-  do {
-    if (num_chunks > 30) {
-      ham_dist   += 1;
-      num_blocks  = ham_dist + 3;
-      num_chunks  = 0;
-    }
-    num_chunks += 1;
-    param.chunk_dist = ham_dist;
-    param.num_blocks = num_blocks;
-    param.num_chunks = num_chunks;
-  } while (calc_missing_edge_ratio(param) >= missing_ratio);
+double SketchSort::mismatch_prob(float minmax_dist) {
+  // Probability that one 8-bit GCWS hash byte differs for a pair at distance
+  // minmax_dist (b-bit minwise collision correction).
+  return (255.0/256.0)*minmax_dist;
 }
 
 void SketchSort::z_normalize() {
@@ -462,7 +273,6 @@ Params SketchSort::init_params(std::uint32_t num_blocks,
   param.num_chunks           = num_chunks;
   param.chunk_dist           = ham_dist;
   param.minmax_dist          = minmax_dist;
-  param.project_dim          = kProjectDim;
   param.auto_mode            = auto_mode;
   param.missing_ratio        = missing_ratio;
   param.z_normalization      = z_normalization;
@@ -470,7 +280,6 @@ Params SketchSort::init_params(std::uint32_t num_blocks,
   param.verbose              = verbose;
   param.seed = (seed < 0) ? static_cast<unsigned long>(time(nullptr))
                           : static_cast<unsigned long>(seed);
-  num_char_ = 256;
   return param;
 }
 
@@ -484,7 +293,11 @@ void SketchSort::run_core(Params &param) {
       throw std::invalid_argument(msg.str());
     }
     if (param.verbose) std::cerr << "tune parameters such that the missing edge ratio is no more than " << param.missing_ratio << std::endl;
-    tune_parameters(param.missing_ratio, param);
+    engine::AutoParams decided =
+        engine::decide_parameters(mismatch_prob(param.minmax_dist), param.missing_ratio, kProjectDim);
+    param.chunk_dist = decided.ham_dist;
+    param.num_blocks = decided.num_blocks;
+    param.num_chunks = decided.num_chunks;
     if (param.verbose) {
       std::cout << "tuned parameters:" << std::endl;
       std::cout << "hamming distance threshold: " << param.chunk_dist << std::endl;
@@ -494,24 +307,13 @@ void SketchSort::run_core(Params &param) {
     }
   }
 
-  if (param.num_blocks == 0 || param.num_chunks == 0)
-    throw std::invalid_argument("num_blocks and num_chunks must be at least 1");
-  if (param.chunk_dist >= param.num_blocks) {
-    std::ostringstream msg;
-    msg << "ham_dist (" << param.chunk_dist << ") must be smaller than num_blocks ("
-        << param.num_blocks << ")";
-    throw std::invalid_argument(msg.str());
-  }
-  if (param.num_blocks > param.project_dim) {
-    std::ostringstream msg;
-    msg << "num_blocks (" << param.num_blocks << ") cannot exceed the chunk length ("
-        << param.project_dim << ")";
-    throw std::invalid_argument(msg.str());
-  }
-  if (param.minmax_dist < 0.f || param.minmax_dist > 1.f)
-    throw std::invalid_argument("minmax distance threshold must be in [0, 1]");
+  engine::validate_params(param.num_blocks, param.num_chunks, param.chunk_dist, kProjectDim,
+                          param.auto_mode, param.minmax_dist, 0.f, 1.f, "minmax_dist");
 
-  if (param.verbose) std::cout << "missing edge ratio:" << calc_missing_edge_ratio(param) << std::endl;
+  if (param.verbose) std::cout << "missing edge ratio:"
+                               << engine::missing_edge_ratio(mismatch_prob(param.minmax_dist), kProjectDim,
+                                                             param.chunk_dist, param.num_chunks)
+                               << std::endl;
 
   double total_start = clock();
 
@@ -524,64 +326,68 @@ void SketchSort::run_core(Params &param) {
     minmax_normalize();
   }
 
-  param.counter = new std::uint32_t[num_char_];
-
   if (param.verbose) {
     std::cout << "number of data:" << fvs_.size() << std::endl;
-    std::cout << "length of strings per chunk:" << param.project_dim << std::endl;
+    std::cout << "length of strings per chunk:" << kProjectDim << std::endl;
     std::cout << "number of chunks:" << param.num_chunks << std::endl;
-    std::cout << "total length of strings:" << param.project_dim * param.num_chunks << std::endl;
+    std::cout << "total length of strings:" << kProjectDim * param.num_chunks << std::endl;
   }
 
   double project_start = clock();
   if (param.verbose) std::cerr << "start projection" << std::endl;
   std::vector<uint8_t*> sig;
-  project_vectors(param.project_dim * param.num_chunks, sig, param);
+  project_vectors(kProjectDim * param.num_chunks, sig, param.seed, param.verbose);
   if (param.verbose) std::cerr << "end projection" << std::endl;
   double project_end = clock();
   if (param.verbose) std::cout << "projecttime:" << (project_end - project_start)/(double)CLOCKS_PER_SEC << std::endl;
-
-  // Work buffers reused by every radix_sort call instead of reallocating.
-  param.new_sig.resize(param.num_seq);
-  param.new_ids.resize(param.num_seq);
-
-  param.pchunks = new PosRange[param.num_chunks + 1];
-  for (int i = 1; i <= (int)param.num_chunks; i++) {
-    param.pchunks[i].start = (int)ceil((double)param.seq_len*((double)(i - 1)/(double)param.num_chunks)) + 1;
-    param.pchunks[i].end   = (int)ceil((double)param.seq_len*(double)i/(double)param.num_chunks);
-  }
-
-  double msm_time = 0.0;
 
   if (param.verbose) {
     std::cerr << "chunk distance:" << param.chunk_dist << std::endl;
     std::cerr << "the number of blocks:" << param.num_blocks << std::endl;
   }
-  param.pos = new PosRange[param.num_blocks + 1];
-  for (int i = 1; i <= (int) param.num_chunks; i++) {
-    param.chunk_len     = param.pchunks[i].end - param.pchunks[i].start + 1;
-    param.start_chunk   = param.pchunks[i].start;
-    param.current_chunk = i;
-    for (int j = 1; j <= (int)param.num_blocks; j++) {
-      param.pos[j].start = (int)ceil((double)param.chunk_len*((double)(j - 1)/(double)param.num_blocks)) + param.pchunks[i].start;
-      param.pos[j].end   = (int)ceil((double)param.chunk_len*(double)j/(double)param.num_blocks) + param.pchunks[i].start - 1;
+
+  // Exact-verification + emission hook handed to the shared enumeration
+  // engine; GCWS hash bytes use the full 256-letter alphabet.
+  struct Emitter {
+    SketchSort *self;
+    Params *p;
+    bool prefilter(std::uint32_t, std::uint32_t) { return true; }
+    void candidate(std::uint32_t id1, std::uint32_t id2) {
+      float dist = self->calc_minmax_dist(id1, id2);
+      if (dist <= p->minmax_dist) {
+	if (p->pairs) {
+	  Pair pr;
+	  pr.id1         = id1;
+	  pr.id2         = id2;
+	  pr.minmax_dist = dist;
+	  p->pairs->push_back(pr);
+	}
+	if (p->os) {
+	  (*p->os) << id1 << " " << id2 << " " << dist << "\n";
+	}
+      }
     }
-    if (param.verbose) std::cerr << "start enumeration chunk no " << i << std::endl;
-    double msm_start = clock();
-    multi_classification(sig, 1, 0, param.num_seq - 1, param);
-    double msm_end   = clock();
-    msm_time += (msm_end - msm_start)/(double)CLOCKS_PER_SEC;
-  }
-  if (param.verbose) std::cout << "msmtime:" << msm_time << std::endl;
+  } emitter{this, &param};
+
+  engine::Config cfg;
+  cfg.num_blocks    = param.num_blocks;
+  cfg.num_chunks    = param.num_chunks;
+  cfg.ham_dist      = param.chunk_dist;
+  cfg.alphabet_size = 256;
+  cfg.sketch_len    = kProjectDim * param.num_chunks;
+  cfg.verbose       = param.verbose;
+  engine::MultiSortEngine<Emitter> eng(cfg, sig, emitter);
+
+  double msm_start = clock();
+  eng.run();
+  double msm_end   = clock();
+  if (param.verbose) std::cout << "msmtime:" << (msm_end - msm_start)/(double)CLOCKS_PER_SEC << std::endl;
 
   double total_end = clock();
   if (param.verbose) std::cout << "cputime:" << (total_end - total_start)/(double)CLOCKS_PER_SEC << std::endl;
 
   delete[] sig_pool_;
   sig_pool_ = nullptr;
-  delete[] param.counter;
-  delete[] param.pchunks;
-  delete[] param.pos;
 }
 
 void SketchSort::run(const char *input_path, const char *output_path,

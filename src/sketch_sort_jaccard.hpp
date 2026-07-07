@@ -6,9 +6,8 @@
  * See the LICENSE file in the project root for the full license text.
  *
  * Jaccard/Tanimoto all-pairs similarity search over sparse integer-id sets.
- * Sketches are MinHash values (one byte per hash). Enumeration reuses the
- * same multiple-sort machinery as the cosine and min-max variants but lives
- * in its own sub-namespace so the three cores can coexist in one library.
+ * Sketches are MinHash values (one byte per hash); the enumeration itself
+ * runs on the shared engine in multi_sort_engine.hpp.
  */
 
 #ifndef SKETCH_SORT_JACCARD_HPP
@@ -35,11 +34,6 @@
 namespace sketchsort {
 namespace jaccard {
 
-struct PosRange {
-  int start;
-  int end;
-};
-
 struct Pair {
   std::uint32_t id1;
   std::uint32_t id2;
@@ -50,22 +44,13 @@ static_assert(offsetof(Pair, id1)          == 0,  "unexpected layout");
 static_assert(offsetof(Pair, id2)          == 4,  "unexpected layout");
 static_assert(offsetof(Pair, jaccard_dist) == 8,  "unexpected layout");
 
+// Metric-level parameters only; the multiple-sort enumeration state lives in
+// engine::MultiSortEngine (multi_sort_engine.hpp).
 struct Params {
   unsigned int num_blocks;
   unsigned int num_chunks;
-  unsigned int project_dim;
   unsigned int chunk_dist;
-  unsigned int num_seq;
-  unsigned int seq_len;
-  unsigned int chunk_len;
-  unsigned int start_chunk;
-  unsigned int cchunk;
-  unsigned int *counter;
-  PosRange     *pos;
-  PosRange     *pchunks;
   float         jaccard_dist;
-  std::vector<unsigned int> ids;
-  std::vector<int> blocks;
   std::ostream *os    = nullptr;
   std::vector<Pair> *pairs = nullptr;
   bool          auto_mode     = false;
@@ -80,7 +65,6 @@ class SketchSort {
   std::mt19937  rng_;
   std::vector<std::vector<std::uint32_t> > fvs_;
   int                max_item_;
-  std::uint32_t      num_char_;
 
   void read_features(const char *file_name);
   void set_features_from_sets(const std::vector<std::vector<std::uint32_t> > &sets);
@@ -93,21 +77,12 @@ class SketchSort {
                      unsigned int seed,
                      bool         verbose);
   void run_core(Params &param);
-  int project_vectors(unsigned int project_dim, std::vector<uint8_t*> &sig, Params &param);
-  void report(std::vector<uint8_t*> &sig, int l, int r, Params &param);
-  void radix_sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, Params &param);
-  void insertion_sort(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, Params &param);
-  bool calc_chunk_hamdist(uint8_t *seq1, uint8_t *seq2, const Params &param);
-  bool check_canonical(uint8_t *seq1, uint8_t *seq2, const Params &param);
-  bool check_chunk_canonical(uint8_t *seq1, uint8_t *seq2, const Params &param);
+  void project_vectors(unsigned int project_dim, std::vector<uint8_t*> &sig);
   float calc_jaccard_dist(unsigned int id1, unsigned int id2);
   float check_upper_bound(unsigned int id1, unsigned int id2);
-  double calc_missing_edge_ratio(Params &param);
-  void classify(std::vector<uint8_t*> &sig, int spos, int epos, int l, int r, int bpos, Params &param);
-  void decide_parameters(float missing_ratio, Params &param);
-  void multi_classification(std::vector<uint8_t*> &sig, int maxind, int l, int r, Params &param);
+  static double mismatch_prob(float jaccard_dist);
  public:
-  SketchSort() : max_item_(0), num_char_(0) {}
+  SketchSort() : max_item_(0) {}
 
   // File in, file out. Matches the standalone CLI's behaviour and output.
   void run(const char *file_name, const char *output_name,
