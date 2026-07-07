@@ -51,6 +51,8 @@ jobs:
           # The wheel does NOT ship the C++ CLI, so test_cpp_cli.py is excluded.
           CIBW_TEST_COMMAND: >-
             pytest {project}/tests/test_search.py
+            {project}/tests/test_search_minmax.py
+            {project}/tests/test_search_jaccard.py
             {project}/tests/test_cli.py
             {project}/tests/test_golden.py
 
