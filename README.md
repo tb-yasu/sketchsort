@@ -171,32 +171,45 @@ whitespace-separated integer-id set per line.
 
 ## Command line
 
-Installing the package also installs a `sketchsort` console script. It
+Installing the package also installs a `sketchsort` console script. Pick
+the metric with `-metric {cosine,minmax,jaccard}` (default: cosine). It
 uses the same defaults as the Python API: automatic parameter selection
 unless you pass any of `-hamdist` / `-numblocks` / `-numchunks`.
 
 ```
-# Typical: cos_dist + missing_ratio
+# Cosine (default metric): cos_dist + missing_ratio
 sketchsort -cosdist 0.01 -missingratio 0.0001 -seed 42 input.txt output.txt
 
-# Manual parameter control
+# Cosine with manual parameter control
 sketchsort -cosdist 0.01 -hamdist 1 -numblocks 4 -numchunks 3 -seed 42 input.txt output.txt
+
+# Min-max on dense float vectors
+sketchsort -metric minmax -minmax 0.2 -missingratio 0.0001 -seed 42 input.txt output.txt
+
+# Jaccard on integer-id sets (one whitespace-separated set per line)
+sketchsort -metric jaccard -jaccard 0.05 -missingratio 0.0001 -seed 42 sets.txt output.txt
 ```
 
-Flags: `-cosdist`, `-missingratio`, `-hamdist`, `-numblocks`, `-numchunks`,
-`-auto`, `-centering`, `-seed`, `-quiet`. `-auto` forces automatic
+Shared flags: `-metric`, `-missingratio`, `-hamdist`, `-numblocks`,
+`-numchunks`, `-auto`, `-seed`, `-quiet`. `-auto` forces automatic
 parameter selection even if any of `-hamdist` / `-numblocks` /
-`-numchunks` is also given. `-centering` subtracts the coordinate-wise
-mean from the input vectors before both sketching and distance
-computation (reported `cos_dist` is then between mean-shifted vectors).
+`-numchunks` is also given.
+
+Per-metric flags: `-cosdist` (cosine threshold) and `-centering`
+(cosine only: subtract the coordinate-wise mean before both sketching
+and distance computation, so the reported `cos_dist` is between
+mean-shifted vectors); `-minmax` (min-max threshold), `-znormalization`
+and `-minmaxnormalization` (min-max only: per-dimension rescaling before
+sketching); `-jaccard` (Jaccard threshold).
 
 ## Memory note
 
-`sketchsort.search(...)` collects every reported pair into memory before
-returning. For large inputs at loose thresholds the result can be very
-large (tens of millions of pairs are realistic). If memory is a concern,
-use `sketchsort.run_from_file(...)` instead — it streams pairs to disk
-while the algorithm runs.
+The in-memory functions (`search`, `search_minmax`, `search_jaccard`)
+collect every reported pair into memory before returning. For large
+inputs at loose thresholds the result can be very large (tens of millions
+of pairs are realistic). If memory is a concern, use the corresponding
+`run_from_file*` function instead — it streams pairs to disk while the
+algorithm runs.
 
 ## 0.3.0 release notes
 
