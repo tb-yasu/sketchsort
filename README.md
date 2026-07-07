@@ -9,7 +9,7 @@ below a given threshold, under three similarity measures:
 | --- | --- | --- | --- |
 | **Cosine** | dense float vectors | `search` | `1 - ⟨x,y⟩/(‖x‖·‖y‖)` |
 | **Min-max** (generalized Jaccard / Tanimoto on real vectors) | dense float vectors | `search_minmax` | `1 - Σ min(xᵢ,yᵢ)/Σ max(xᵢ,yᵢ)` |
-| **Jaccard / Tanimoto** | sparse integer-id sets | `search_jaccard` | `1 - &#124;A∩B&#124;/&#124;A∪B&#124;` |
+| **Jaccard / Tanimoto** | sparse integer-id sets | `search_jaccard` | `1 - \|A∩B\|/\|A∪B\|` |
 
 Each metric sketches its input into a short byte string — sign of a random
 projection (cosine), generalized consistent weighted sampling (min-max),
