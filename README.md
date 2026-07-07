@@ -395,17 +395,28 @@ for Large Databases of Molecular Fingerprints*. Molecular Informatics
 }
 ```
 
-## License
-
-The cosine core (`src/sketch_sort.*`, `src/main.cpp`) and the Python
-packaging are MIT-licensed (see `LICENSE`). The min-max and Jaccard cores
-(`src/sketch_sort_minmax.*`, `src/sketch_sort_jaccard.*`) are BSD-3-Clause,
-as noted in their per-file SPDX headers. The bundled Boost headers under
-`src/boost/` are distributed under the Boost Software License 1.0 (see
-`NOTICE`).
-
-The min-max method additionally builds on:
+**Min-max sketching** (generalized consistent weighted sampling, used by
+`search_minmax`):
 
 Li, P. (2017). *Linearized GMM Kernels and Normalized Random Fourier
 Features*. In Proceedings of the 23rd ACM SIGKDD International Conference on
 Knowledge Discovery and Data Mining (KDD), 315–324.
+doi:[10.1145/3097983.3098081](https://doi.org/10.1145/3097983.3098081)
+
+```bibtex
+@inproceedings{li2017linearized,
+  title     = {Linearized GMM Kernels and Normalized Random Fourier Features},
+  author    = {Li, Ping},
+  booktitle = {Proceedings of the 23rd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD)},
+  pages     = {315--324},
+  year      = {2017},
+  doi       = {10.1145/3097983.3098081},
+}
+```
+
+## License
+
+MIT for the entire SketchSort source — all three metric cores, the shared
+enumeration engine, the CLI, and the Python packaging (see `LICENSE`).
+The bundled Boost headers under `src/boost/` are distributed under the
+Boost Software License 1.0 (see `NOTICE`).

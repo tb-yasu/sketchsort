@@ -2,7 +2,7 @@
  * sketch_sort_minmax.cpp
  * Copyright (c) 2017 Yasuo Tabei
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-License-Identifier: MIT
  * See the LICENSE file in the project root for the full license text.
  */
 

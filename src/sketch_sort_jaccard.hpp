@@ -2,7 +2,7 @@
  * sketch_sort_jaccard.hpp
  * Copyright (c) 2011 Yasuo Tabei
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-License-Identifier: MIT
  * See the LICENSE file in the project root for the full license text.
  *
  * Jaccard/Tanimoto all-pairs similarity search over sparse integer-id sets.

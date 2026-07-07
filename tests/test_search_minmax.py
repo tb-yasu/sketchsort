@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: MIT
 # Copyright (c) 2017 Yasuo Tabei
 """Tests for sketchsort.search_minmax() / run_from_file_minmax().
 

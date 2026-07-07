@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: MIT
 # Copyright (c) 2011 Yasuo Tabei
 """Tests for sketchsort.search_jaccard() / run_from_file_jaccard().
 
