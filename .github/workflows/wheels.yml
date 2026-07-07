@@ -47,6 +47,11 @@ jobs:
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-*"
           CIBW_SKIP: "*-musllinux_* pp* *-win32"
           CIBW_ARCHS_LINUX: "x86_64"
+          # manylinux_2_28 (not the 2014 default): recent NumPy releases ship
+          # no manylinux2014 wheels, so the in-container test venv would fall
+          # back to building NumPy from source and fail on the old gcc there.
+          # Our hard numpy>=1.21 dependency makes 2014-only targets moot anyway.
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           CIBW_TEST_REQUIRES: "pytest numpy"
           # The wheel does NOT ship the C++ CLI, so test_cpp_cli.py is excluded.
           CIBW_TEST_COMMAND: >-
