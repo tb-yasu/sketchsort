@@ -41,7 +41,8 @@ X = np.loadtxt("vectors.txt", dtype=np.float32)  # shape (N, D), row i has id i
 # Cosine distance
 cos_pairs = sketchsort.search(X, cos_dist=0.01, missing_ratio=1e-4, seed=42)
 
-# Min-max distance (generalized Jaccard on real vectors)
+# Min-max distance (generalized Jaccard on real vectors; use when this
+# distance is meaningful for your features)
 minmax_pairs = sketchsort.search_minmax(X, minmax_dist=0.2, missing_ratio=1e-4, seed=42)
 
 # Jaccard / Tanimoto distance (sparse integer-id sets)
@@ -67,7 +68,7 @@ parameter reference and [Command line](#command-line) for the
 | **Min-max** (generalized Jaccard/Tanimoto on real vectors) | dense float vectors | `search_minmax` | `1 - Σ min(xᵢ,yᵢ)/Σ max(xᵢ,yᵢ)` |
 | **Jaccard / Tanimoto** | sparse integer-id sets | `search_jaccard` | <code>1 - &#124;A∩B&#124;/&#124;A∪B&#124;</code> |
 
-Each metric sketches its input into a short byte string — sign of a random
+Each metric converts its input into a compact sketch — sign of a random
 projection (cosine), generalized consistent weighted sampling (min-max), or
 MinHash (Jaccard) — then enumerates near-duplicate sketches using the
 shared multiple-sorting technique of Tabei et al. (2010); see
@@ -370,8 +371,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 **0.3.0** adds the min-max and Jaccard/Tanimoto metrics alongside cosine,
 unifies all three onto one shared multiple-sort enumeration engine
-(verified byte-identical output), and relicenses the whole source tree to
-MIT.
+(verified byte-identical output), and relicenses the SketchSort codebase
+to MIT. Bundled Boost headers remain under the Boost Software License 1.0.
 
 ## Citation
 
