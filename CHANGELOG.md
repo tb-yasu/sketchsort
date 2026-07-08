@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.1] - 2026-07-08
+
+### Changed
+
+No code changes. README overhaul: leads with what the library does and
+its approximate-recall / exact-verification contract instead of only the
+multiple-sorting technique; adds a Quick start covering all three metrics;
+splits the Python API reference from a new Advanced options section
+(parameter signatures, `missing_ratio`/auto mode, manual mode, `seed`,
+`centering`, normalization, `verbose`); moves per-version release notes to
+`CHANGELOG.md`.
+
 ## [0.3.0] - 2026-07-07
 
 ### Added

@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "sketchsort"
-version = "0.3.0"
+version = "0.3.1"
 description = "Fast all-pairs similarity search via random projection sketches (cosine, min-max, and Jaccard metrics)"
 readme = "README.md"
 requires-python = ">=3.9"

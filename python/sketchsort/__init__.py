@@ -33,7 +33,7 @@ __all__ = [
     "search_jaccard",
     "run_from_file_jaccard",
 ]
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 
 # Internal defaults for the explicit-mode parameters. Only used to fill in
