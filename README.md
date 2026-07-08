@@ -1,15 +1,18 @@
 # sketchsort
 
 SketchSort is a batch **all-pairs similarity search** library: given a
-dataset, it enumerates every pair of records whose distance is at most a
-given threshold. Typical uses include near-duplicate detection, molecular
-fingerprint search, and nearest-neighbor-style filtering over embeddings.
+dataset, it reports pairs of records whose distance is at most a given
+threshold. Typical uses include near-duplicate detection, molecular
+fingerprint search, and threshold-based similarity filtering over
+embeddings — offline/batch search, not online single-query
+k-nearest-neighbor lookup.
 
 It is an **approximate-recall, exact-verification** method: every reported
 pair's distance is computed exactly (no false positives), while some true
 pairs may be missed depending on the sketch parameters. The `missing_ratio`
-parameter bounds the expected fraction of missed pairs — smaller values
-search more exhaustively at the cost of more time and memory.
+parameter targets an upper bound on the expected fraction of missed
+true-neighbor pairs under the sketching model — smaller values search more
+exhaustively at the cost of more time and memory.
 
 Three distance functions are supported — **cosine**, **min-max**
 (generalized Jaccard/Tanimoto on real vectors), and **Jaccard/Tanimoto**
@@ -36,24 +39,25 @@ import sketchsort
 X = np.loadtxt("vectors.txt", dtype=np.float32)  # shape (N, D), row i has id i
 
 # Cosine distance
-pairs = sketchsort.search(X, cos_dist=0.01, missing_ratio=1e-4, seed=42)
+cos_pairs = sketchsort.search(X, cos_dist=0.01, missing_ratio=1e-4, seed=42)
 
 # Min-max distance (generalized Jaccard on real vectors)
-pairs = sketchsort.search_minmax(X, minmax_dist=0.2, missing_ratio=1e-4, seed=42)
+minmax_pairs = sketchsort.search_minmax(X, minmax_dist=0.2, missing_ratio=1e-4, seed=42)
 
 # Jaccard / Tanimoto distance (sparse integer-id sets)
 sets = [[0, 3, 7], [0, 3, 7, 9], [1, 2], [7, 9]]
-pairs = sketchsort.search_jaccard(sets, jaccard_dist=0.5, missing_ratio=1e-4, seed=42)
+jaccard_pairs = sketchsort.search_jaccard(sets, jaccard_dist=0.5, missing_ratio=1e-4, seed=42)
 
-for id1, id2, dist in pairs:
+for id1, id2, dist in cos_pairs:
     print(id1, id2, dist)
 ```
 
-Each function returns a NumPy structured array
-`[('id1', '<u4'), ('id2', '<u4'), ('<metric>_dist', '<f4')]`. `id1`/`id2`
-are row indices into the input; each pair appears at most once. See
-[Python API](#python-api) for the full parameter reference and
-[Command line](#command-line) for the `sketchsort` CLI.
+Each function returns a NumPy structured array with fields `id1`, `id2`,
+and one distance field — `cos_dist`, `minmax_dist`, or `jaccard_dist`
+depending on the metric. `id1`/`id2` are row indices into the input; each
+pair appears at most once. See [Python API](#python-api) for the full
+parameter reference and [Command line](#command-line) for the
+`sketchsort` CLI.
 
 ## Supported metrics
 
@@ -148,8 +152,9 @@ sketchsort.run_from_file_jaccard("sets.txt", "output.txt", jaccard_dist=0.05, se
 
 `run_from_file`/`run_from_file_minmax` read whitespace-separated float
 vectors, one per line, no ID column; `run_from_file_jaccard` reads one
-whitespace-separated integer-id set per line. All three write
-`id1 id2 <metric>_dist` triples to the output file.
+whitespace-separated integer-id set per line. All three write `id1 id2
+dist` triples to the output file, where `dist` is the metric's distance
+field (`cos_dist`, `minmax_dist`, or `jaccard_dist`).
 
 Every line of a float-vector input file must carry exactly as many numeric
 tokens as the first line (that count becomes the file's dimension). Blank
@@ -201,8 +206,9 @@ algorithm runs.
 
 ## Advanced options
 
-Every parameter below is keyword-only. This is the signature of each
-`search*` function at its auto-mode defaults; `run_from_file*` takes the
+Except for the input (`X` or `sets`), every parameter below is
+keyword-only. This is the signature of each `search*` function at its
+auto-mode defaults; `run_from_file*` takes the
 same keywords plus `input_path`/`output_path` in place of `X`/`sets`. All
 three also accept `ham_dist`, `num_blocks`, `num_chunks` (omitted here —
 each defaults to `None`) to switch to
@@ -369,7 +375,7 @@ MIT.
 
 ## Citation
 
-If you use SketchSort in published work, please cite the original papers:
+If you use SketchSort in published work, please cite the relevant papers:
 
 **Methodology** (the multiple-sorting technique):
 
