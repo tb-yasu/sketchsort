@@ -183,12 +183,12 @@ Shared flags: `-metric`, `-missingratio`, `-hamdist`, `-numblocks`,
 parameter selection even if any of `-hamdist` / `-numblocks` /
 `-numchunks` is also given.
 
-Per-metric flags: `-cosdist` (cosine threshold) and `-centering`
-(cosine only: subtract the coordinate-wise mean before both sketching
-and distance computation, so the reported `cos_dist` is between
+Per-metric flags: `-cosdist` (cosine threshold) and `-centering` (only
+with `-metric cosine`: subtract the coordinate-wise mean before both
+sketching and distance computation, so the reported `cos_dist` is between
 mean-shifted vectors); `-minmax` (min-max threshold), `-znormalization`
-and `-minmaxnormalization` (min-max only: per-dimension rescaling before
-sketching); `-jaccard` (Jaccard threshold).
+and `-minmaxnormalization` (only with `-metric minmax`: per-dimension
+rescaling before sketching); `-jaccard` (Jaccard threshold).
 
 ## Memory note
 
@@ -213,7 +213,7 @@ sketchsort.search(
     X,
     cos_dist=0.01,           # report pairs with cosine distance <= this
     missing_ratio=0.0001,    # auto mode only: upper bound on expected miss rate
-    centering=False,         # cosine-only: subtract per-dimension mean first
+    centering=False,         # search() only: subtract per-dimension mean first
     seed=0,                  # RNG seed; same seed + inputs -> same output
     verbose=False,           # print progress to stdout/stderr
 )
@@ -222,8 +222,8 @@ sketchsort.search_minmax(
     X,
     minmax_dist=0.1,
     missing_ratio=0.0001,
-    z_normalization=False,      # min-max-only: rescale each column to mean 0, var 1
-    minmax_normalization=False, # min-max-only: rescale each column to [0, 1]
+    z_normalization=False,      # search_minmax() only: rescale each column to mean 0, var 1
+    minmax_normalization=False, # search_minmax() only: rescale each column to [0, 1]
     seed=0,                     # -1 derives the seed from the clock instead
     verbose=False,
 )
