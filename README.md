@@ -201,17 +201,17 @@ algorithm runs.
 
 ## Advanced options
 
-Every parameter below is keyword-only. This is the full signature of each
-`search*` function; `run_from_file*` takes the same keywords plus
-`input_path`/`output_path` in place of `X`/`sets`:
+Every parameter below is keyword-only. This is the signature of each
+`search*` function at its auto-mode defaults; `run_from_file*` takes the
+same keywords plus `input_path`/`output_path` in place of `X`/`sets`. All
+three also accept `ham_dist`, `num_blocks`, `num_chunks` (omitted here —
+each defaults to `None`) to switch to
+[manual mode](#manual-parameter-control):
 
 ```python
 sketchsort.search(
     X,
     cos_dist=0.01,           # report pairs with cosine distance <= this
-    ham_dist=None,           # leave all three at None for auto mode (below),
-    num_blocks=None,         # or set all three together for manual mode
-    num_chunks=None,
     missing_ratio=0.0001,    # auto mode only: upper bound on expected miss rate
     centering=False,         # cosine-only: subtract per-dimension mean first
     seed=0,                  # RNG seed; same seed + inputs -> same output
@@ -221,7 +221,6 @@ sketchsort.search(
 sketchsort.search_minmax(
     X,
     minmax_dist=0.1,
-    ham_dist=None, num_blocks=None, num_chunks=None,
     missing_ratio=0.0001,
     z_normalization=False,      # min-max-only: rescale each column to mean 0, var 1
     minmax_normalization=False, # min-max-only: rescale each column to [0, 1]
@@ -232,7 +231,6 @@ sketchsort.search_minmax(
 sketchsort.search_jaccard(
     sets,
     jaccard_dist=0.05,
-    ham_dist=None, num_blocks=None, num_chunks=None,
     missing_ratio=0.0001,
     seed=5489,               # different default than the other two metrics;
     verbose=False,           # still a fixed, reproducible value
